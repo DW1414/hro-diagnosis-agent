@@ -1,0 +1,2 @@
+2.3.0
+云端托管首版：GitHub Pages 托管程序壳，version.json 驱动热更新（提示/自动二选一），?pin=REL-xxx 钉住历史版本回滚；知识库仍在本地（localStorage + 本地快照回滚），热更不碰本机数据

@@ -1,0 +1,11 @@
+{
+  "ver": "2.3.0",
+  "build": "535f71018f2d8207",
+  "time": "2026-11-03 11:40:37",
+  "kbVer": "2.2.5",
+  "kbSchema": 1,
+  "notes": "云端托管首版：GitHub Pages 托管程序壳，version.json 驱动热更新（提示/自动二选一），?pin=REL-xxx 钉住历史版本回滚；知识库仍在本地（localStorage + 本地快照回滚），热更不碰本机数据",
+  "minShell": "2.3.0",
+  "size": 277221,
+  "sha256": "fb4b647113b6fa7b165350d276ed31ed3f6c850182941ddbbae4ee519975f6af"
+}

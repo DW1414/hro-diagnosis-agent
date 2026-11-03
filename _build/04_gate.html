@@ -1,0 +1,118 @@
+<!-- ===== 访问门禁（离线校验，密码不以明文出现在源码中） ===== -->
+<style>
+#gate{position:fixed;inset:0;z-index:99999;display:flex;align-items:center;justify-content:center;padding:24px;
+  background:radial-gradient(920px 520px at 12% -10%,rgba(232,197,132,.18),transparent 58%),#061018}
+#gate .gcard{width:min(420px,100%);background:rgba(12,22,34,.92);border:1px solid rgba(232,197,132,.24);
+  border-radius:22px;box-shadow:0 28px 80px rgba(0,0,0,.55);padding:34px 30px 24px;text-align:center;color:#f4f7ff;
+  font-family:"PingFang SC","Hiragino Sans GB","Microsoft YaHei","Noto Sans SC",system-ui,sans-serif}
+#gate .gicon{width:56px;height:56px;margin:0 auto 14px;border-radius:16px;display:flex;align-items:center;justify-content:center;
+  font-size:26px;background:rgba(232,197,132,.12);border:1px solid rgba(232,197,132,.32)}
+#gate h1{margin:0 0 6px;font-size:19px;letter-spacing:.6px;font-weight:700}
+#gate p.gsub{margin:0 0 22px;font-size:12.5px;color:#9aabc4}
+#gate input{width:100%;padding:13px 15px;border-radius:13px;border:1px solid rgba(232,197,132,.24);
+  background:rgba(6,16,24,.8);color:#f4f7ff;font-size:15px;letter-spacing:2px;outline:none;text-align:center}
+#gate input:focus{border-color:#e8c584;box-shadow:0 0 0 3px rgba(232,197,132,.12)}
+#gate input::placeholder{color:#6b7d96;letter-spacing:0}
+#gate .gbtn{margin-top:14px;width:100%;padding:13px;border-radius:13px;border:0;cursor:pointer;
+  background:linear-gradient(135deg,#e8c584,#f6e2b8);color:#061018;font-size:15px;font-weight:700;letter-spacing:1px}
+#gate .gbtn:hover{filter:brightness(1.06)}
+#gate .gerr{margin-top:11px;font-size:12.5px;color:#ff6b88;min-height:18px}
+#gate .gchk{margin-top:14px;display:flex;align-items:center;justify-content:center;gap:7px;font-size:12.5px;color:#9aabc4;cursor:pointer;user-select:none}
+#gate .gchk input{width:14px;height:14px;margin:0;accent-color:#e8c584;cursor:pointer}
+#gate .gtip{margin-top:18px;font-size:11px;color:#5d708a;line-height:1.7}
+#gate.shake .gcard{animation:gsh .38s}
+@keyframes gsh{0%,100%{transform:translateX(0)}25%{transform:translateX(-9px)}75%{transform:translateX(9px)}}
+#glock{position:fixed;right:16px;bottom:calc(16px + env(safe-area-inset-bottom,0px));z-index:99998;
+  width:38px;height:38px;border-radius:50%;display:flex;align-items:center;justify-content:center;
+  font-size:16px;cursor:pointer;background:rgba(12,22,34,.85);border:1px solid rgba(232,197,132,.24);
+  color:#e8c584;opacity:.5;transition:opacity .2s}
+#glock:hover{opacity:1}
+@media print{#gate,#glock{display:none!important}}
+</style>
+
+<div id="gate">
+  <div class="gcard">
+    <div class="gicon">🔒</div>
+    <h1>项目运营诊断智能体</h1>
+    <p class="gsub">制造业 / 服务业外包 · 项目走访诊断与改善建议</p>
+    <input id="gateIn" type="password" placeholder="请输入访问密码" autocomplete="off" spellcheck="false" />
+    <div class="gerr" id="gateErr"></div>
+    <button class="gbtn" id="gateBtn">进 入 系 统</button>
+    <label class="gchk"><input type="checkbox" id="gateKeep" checked /> 在此设备记住 7 天</label>
+    <div class="gtip">离线单文件运行 · 数据仅存本机浏览器 · 不上传任何服务器<br />忘记密码请联系系统管理员</div>
+  </div>
+</div>
+
+<script>
+(function(){
+  var GATE_OK = 2877810214;      /* 访问密码校验值（非明文），修改密码需同步此值 */
+  var KEY = 'opsdiag.gate', DAYS = 7;
+  function hh(s){
+    var x = 0x811c9dc5 >>> 0, i;
+    for(i=0;i<s.length;i++){ x ^= s.charCodeAt(i); x = Math.imul(x, 0x01000193) >>> 0; }
+    for(i=0;i<8;i++){ x ^= x >>> 13; x = Math.imul(x, 0x5bd1e995) >>> 0; }
+    return x >>> 0;
+  }
+  var g = document.getElementById('gate');
+  var inp = document.getElementById('gateIn');
+  var err = document.getElementById('gateErr');
+  var btn = document.getElementById('gateBtn');
+  var keep = document.getElementById('gateKeep');
+
+  function lockBtn(){
+    if(document.getElementById('glock')) return;
+    var lk = document.createElement('div');
+    lk.id = 'glock'; lk.title = '锁定系统（重新验证密码）'; lk.textContent = '🔒';
+    lk.addEventListener('click', function(){
+      try{ localStorage.removeItem(KEY); }catch(e){}
+      location.reload();
+    });
+    document.body.appendChild(lk);
+  }
+  function unlock(){
+    g.style.display = 'none';
+    document.documentElement.style.overflow = '';
+    try{ var l = document.getElementById('glock'); if(l) l.remove(); }catch(e){}
+    lockBtn();
+    if(window.__diag) return;
+  }
+  function tryPass(){
+    var v = (inp.value || '').trim();
+    if(!v){ err.textContent = '请输入访问密码'; shake(); return; }
+    if(hh(v) !== GATE_OK){
+      err.textContent = '密码不正确，请重试';
+      inp.value = ''; shake(); inp.focus(); return;
+    }
+    err.textContent = '';
+    if(keep.checked){
+      try{ localStorage.setItem(KEY, JSON.stringify({v: hh(v), t: Date.now()})); }catch(e){}
+    } else {
+      try{ localStorage.removeItem(KEY); }catch(e){}
+    }
+    unlock();
+  }
+  function shake(){
+    g.classList.remove('shake');
+    void g.offsetWidth;
+    g.classList.add('shake');
+  }
+  if(btn) btn.addEventListener('click', tryPass);
+  if(inp) inp.addEventListener('keydown', function(e){ if(e.key === 'Enter') tryPass(); });
+
+  var ok = false;
+  try{
+    var raw = localStorage.getItem(KEY);
+    if(raw){
+      var o = JSON.parse(raw);
+      if(o && o.v === GATE_OK && (Date.now() - o.t) < DAYS * 86400000) ok = true;
+      else localStorage.removeItem(KEY);
+    }
+  }catch(e){}
+  if(ok){ unlock(); }
+  else {
+    document.documentElement.style.overflow = 'hidden';
+    setTimeout(function(){ try{ inp.focus(); }catch(e){} }, 80);
+  }
+  window.__gate = { unlock: unlock, hash: hh };
+})();
+</script>

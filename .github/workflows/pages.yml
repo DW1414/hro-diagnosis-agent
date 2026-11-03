@@ -1,0 +1,86 @@
+# 程序云端托管：GitHub Pages 自动部署
+# 触发：main 分支推送 / 手动（可指定 tag 或 commit 做整站回滚）
+name: Deploy Agent
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'ops-diagnosis-agent.html'
+      - 'version.json'
+      - '_build/**'
+      - 'scripts/**'
+      - 'docs/**'
+      - '.github/workflows/pages.yml'
+  workflow_dispatch:
+    inputs:
+      ref:
+        description: '回滚部署：填 tag 或 commit（留空=当前 main）'
+        required: false
+        default: ''
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  build:
+    name: 构建与校验
+    runs-on: ubuntu-latest
+    steps:
+      - name: 检出代码
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.ref || github.sha }}
+          fetch-depth: 0
+
+      - name: 准备 Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: 重建程序壳（不写本地归档中心）
+        run: python _build/build.py --no-publish
+
+      - name: 生成站点
+        run: python scripts/gen_site.py
+        env:
+          REL_ARCHIVE: /nonexistent-archive
+
+      - name: 冒烟检查（产物完整性 + 版本一致）
+        run: |
+          python - <<'PY'
+          import json, io, os, sys, hashlib
+          html = io.open('docs/index.html', encoding='utf-8').read()
+          vj = json.loads(io.open('docs/version.json', encoding='utf-8').read())
+          assert '__APP_BUILD__' in html, '缺少版本注入块'
+          assert '"build":"%s"' % vj['build'] in html, 'build 指纹不一致'
+          assert '"ver":"%s"' % vj['ver'] in html, '程序版本不一致'
+          assert '<script id="hotupdate">' in html, '缺少热更新模块'
+          assert len(html) > 200000, '产物体积异常：%d' % len(html)
+          assert hashlib.sha256(html.encode('utf-8')).hexdigest() == vj['sha256'], 'sha256 不符'
+          assert os.path.isfile('docs/releases/index.json'), '缺少历史版本清单'
+          print('冒烟通过：v%s / build %s / %d KB' % (vj['ver'], vj['build'], len(html) // 1024))
+          PY
+
+      - name: 上传站点产物
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: docs
+
+  deploy:
+    name: 部署到 Pages
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: 发布
+        id: deployment
+        uses: actions/deploy-pages@v4
