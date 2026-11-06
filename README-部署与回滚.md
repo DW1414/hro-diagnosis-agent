@@ -17,6 +17,8 @@
 
 ## 二、首次上线（约 5 分钟）
 
+> ✅ **已于 2026-11-06 完成**：仓库 `DW1414/hro-diagnosis-agent`，站点 https://dw1414.github.io/hro-diagnosis-agent/ （首次部署 Actions 一次通过，线上验收 7/7）。以下流程留作新环境复刻参考。
+
 ### 1. 建仓库
 GitHub → New repository，名称建议 `hro-diagnosis-agent`，可见性 **Public**（免费账号的 Pages 只支持公开仓库），不要勾选初始化 README。
 
@@ -37,7 +39,7 @@ git push -u origin main
 推送完成后 Actions 会自动跑 `Deploy Agent`，约 1 分钟出链接：
 
 ```
-https://<你的账号>.github.io/hro-diagnosis-agent/
+https://dw1414.github.io/hro-diagnosis-agent/
 ```
 
 ### 4. 打 tag（可选，便于整站回滚）
@@ -85,8 +87,8 @@ git push
 
 ### 路线 A：`?pin=` 秒回滚（不改代码，最灵活）
 ```
-https://<账号>.github.io/hro-diagnosis-agent/?pin=REL-011_v2.2.5
-https://<账号>.github.io/hro-diagnosis-agent/?pin=v2.3.0-535f71018f2d8207
+https://dw1414.github.io/hro-diagnosis-agent/?pin=REL-011_v2.2.5
+https://dw1414.github.io/hro-diagnosis-agent/?pin=v2.3.0-535f71018f2d8207
 ```
 页面会探测历史目录并跳转，顶部黄条提示「当前为历史版本 · 回到最新版」。
 历史版本清单：`docs/releases/index.json`。
