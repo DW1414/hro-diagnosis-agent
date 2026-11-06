@@ -287,7 +287,7 @@
     PROVIDERS.forEach(function (p) { if (p.id === c.pid) cur = p; });
     b.innerHTML = ''
       + '<div class="aidSwitch"><b>接入大模型增强'
-      + '<div style="font-weight:400;font-size:11px;color:#9fb0c2;margin-top:2px">开启后：生成报告时自动结合知识库与大模型，把贴合项目的建议、改写与归纳直接写入诊断报告，每条建议标注出处（知识库 / 大模型）</div></b>'
+      + '<div style="font-weight:400;font-size:11px;color:#9fb0c2;margin-top:2px">开启后：生成报告时自动结合知识库与大模型，把贴合项目的建议、改写与归纳直接写入诊断报告</div></b>'
       + '<input type="checkbox" id="aiOn" ' + (c.on ? 'checked' : '') + ' /></div>'
       + '<div class="aidField"><label>服务商预设</label><select id="aiPid">' + opts + '</select></div>'
       + '<div class="aidRow2">'
@@ -313,7 +313,6 @@
       + '<div class="aidHint" style="margin-top:10px">'
       + '<b style="color:#e8c584">跨域（CORS）提示：</b>浏览器直连官方 API 通常被拦。解法：① 双击运行同目录 <b>llm_proxy.py</b> 本地代理，'
       + '接口地址填 http://127.0.0.1:8787/v1；② 自建网关（One-API / New-API）；③ 本机 Ollama（需 OLLAMA_ORIGINS=*）。<br/>'
-      + '<b style="color:#e8c584">铁律：</b>AI 只做补充、改写与归纳，<b>绝不修改评分与判定结果</b>——分数仍由规则引擎计算，可追溯。<br/>'
       + '<b style="color:#e8c584">隐私：</b>开启自动脱敏后，项目名 / 客户名 / 人名 / 电话 等发送前替换为占位符；'
       + 'API Key 仅存本机浏览器，不随页面分享。</div>';
 

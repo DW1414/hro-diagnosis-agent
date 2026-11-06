@@ -219,7 +219,7 @@ tr.tbd td{background:#fdf6e8}
 </head>
 <body>
 <!--APPBUILD:START-->
-<script id="appbuild">window.__APP_BUILD__={"ver":"2.3.2","build":"a4fc7fd1a948494f","kbVer":"2.2.5","kbSchema":1};</script>
+<script id="appbuild">window.__APP_BUILD__={"ver":"2.3.3","build":"8245a4417ca4838c","kbVer":"2.2.5","kbSchema":1};</script>
 <!--APPBUILD:END-->
 <!--GATE:START-->
 <!-- ===== 访问门禁（离线校验，密码不以明文出现在源码中） ===== -->
@@ -357,7 +357,7 @@ tr.tbd td{background:#fdf6e8}
     </div>
   </header>
 
-  <div class="tips">走访口述与主理人补充信息分两处录入：口述用于「审查与评分」，补充信息用于「提取客户需求 / 项目痛点 / 项目亮点」。语音识别依赖浏览器（Chrome / Edge 最佳）。判定默认走内置知识库规则引擎，离线可用、结论可溯源。</div>
+  <div class="tips">使用前建议先开 AI 大模型接入，可在页面右下角开启。语音识别依赖浏览器（Chrome / Edge 最佳）。判定默认走内置知识库规则引擎，离线可用、结论可溯源。</div>
 
   <div class="journey">
     <div class="now" id="jNow">等待输入</div>
@@ -400,7 +400,7 @@ tr.tbd td{background:#fdf6e8}
 
       <div class="blk" id="bKpi">
       <details class="fold" id="kpiFold">
-        <summary>关键指标速填（选填 · 未填项自动按文本识别，识别不到则标不适用）</summary>
+        <summary>关键指标速填</summary>
         <div class="kpi" id="kpiBox"></div>
         <div class="toolbar"><button class="btn sm" id="btnGrab" type="button">从文本中抓取数值</button><button class="btn sm" id="btnKpiClear" type="button">清空指标</button></div>
       </details>
@@ -899,7 +899,6 @@ window.__KB_SEED__ = {
          tx·tx2 占位语 / holdTip 按住说话提示 / coverTag 覆盖度标题旁小字。text 为空即不显示。 */
 "hints":{"items":[
  {"id":"hintCover","slot":"bCover","text":"生成诊断后自动逐条核对子项覆盖情况；也可点下方「仅检查覆盖度」先单独跑一遍。"},
- {"id":"hintKpi","slot":"bKpi","text":"关键指标速填（选填 · 未填项自动按文本识别，识别不到则标不适用）"},
  {"id":"tipHold","slot":"holdTip","text":"按住说话，松开结束。"},
  {"id":"phTx","slot":"tx","text":"按下下方金色按钮说话。"},
  {"id":"phTx2","slot":"tx2","text":"录入项目经理补充的客户要求、项目痛点、项目亮点等。将用于提取「客户需求 / 项目痛点 / 项目亮点」。"},
@@ -1653,6 +1652,17 @@ function akMigrate(){
       delete KB.cfg.adminKey; KBDirty=true;
     }
     if(KB.cfg.adminKeyHash!=null) KB.cfg.adminKeyHash=String(KB.cfg.adminKeyHash);
+  }catch(e){}
+}
+/* 已退役的页面备注（主人 2026-11-06 定）：指标速填的括注与折叠标题重复，统一去掉
+   已存过旧备注的浏览器启动时就地清理，避免只改种子对老用户不生效 */
+var RETIRED_HINTS=['hintKpi'];
+function retireHints(){
+  try{
+    if(!KB||!KB.hints||!Array.isArray(KB.hints.items)) return;
+    var n=KB.hints.items.length;
+    KB.hints.items=KB.hints.items.filter(function(x){ return x&&RETIRED_HINTS.indexOf(x.id)<0; });
+    if(KB.hints.items.length!==n) KBDirty=true;
   }catch(e){}
 }
 function bumpVer(){
@@ -4022,7 +4032,6 @@ function tabMds(t){
 function tabHints(t){
   var items=(KB.hints&&KB.hints.items)||[];
   var DEF={hintCover:'生成诊断后自动逐条核对子项覆盖情况；也可点下方「仅检查覆盖度」先单独跑一遍。',
-           hintKpi:'关键指标速填（选填 · 未填项自动按文本识别，识别不到则标不适用）',
            tipHold:'按住说话，松开结束。',
            phTx:'按下下方金色按钮说话。',
            phTx2:'录入项目经理补充的客户要求、项目痛点、项目亮点等。将用于提取「客户需求 / 项目痛点 / 项目亮点」。',
@@ -4490,7 +4499,7 @@ function clearAll(){
   $('jsonBox').style.display='none';
 }
 function boot(){
-  KB=loadKB(); akMigrate(); if(KBDirty){ saveKB(true); }   /* 旧的明文密钥就地转哈希 */
+  KB=loadKB(); akMigrate(); retireHints(); if(KBDirty){ saveKB(true); }   /* 旧明文密钥转哈希 + 退役备注清理 */
   buildIndex(); paintVer(); renderKpi(); count();
   $('kbVer').textContent='v'+KB.meta.ver+' · '+KB.meta.updated;
 
@@ -4847,7 +4856,7 @@ window.__diag={run:run,getKB:function(){return KB;},getR:function(){return R;},m
     PROVIDERS.forEach(function (p) { if (p.id === c.pid) cur = p; });
     b.innerHTML = ''
       + '<div class="aidSwitch"><b>接入大模型增强'
-      + '<div style="font-weight:400;font-size:11px;color:#9fb0c2;margin-top:2px">开启后：生成报告时自动结合知识库与大模型，把贴合项目的建议、改写与归纳直接写入诊断报告，每条建议标注出处（知识库 / 大模型）</div></b>'
+      + '<div style="font-weight:400;font-size:11px;color:#9fb0c2;margin-top:2px">开启后：生成报告时自动结合知识库与大模型，把贴合项目的建议、改写与归纳直接写入诊断报告</div></b>'
       + '<input type="checkbox" id="aiOn" ' + (c.on ? 'checked' : '') + ' /></div>'
       + '<div class="aidField"><label>服务商预设</label><select id="aiPid">' + opts + '</select></div>'
       + '<div class="aidRow2">'
@@ -4873,7 +4882,6 @@ window.__diag={run:run,getKB:function(){return KB;},getR:function(){return R;},m
       + '<div class="aidHint" style="margin-top:10px">'
       + '<b style="color:#e8c584">跨域（CORS）提示：</b>浏览器直连官方 API 通常被拦。解法：① 双击运行同目录 <b>llm_proxy.py</b> 本地代理，'
       + '接口地址填 http://127.0.0.1:8787/v1；② 自建网关（One-API / New-API）；③ 本机 Ollama（需 OLLAMA_ORIGINS=*）。<br/>'
-      + '<b style="color:#e8c584">铁律：</b>AI 只做补充、改写与归纳，<b>绝不修改评分与判定结果</b>——分数仍由规则引擎计算，可追溯。<br/>'
       + '<b style="color:#e8c584">隐私：</b>开启自动脱敏后，项目名 / 客户名 / 人名 / 电话 等发送前替换为占位符；'
       + 'API Key 仅存本机浏览器，不随页面分享。</div>';
 

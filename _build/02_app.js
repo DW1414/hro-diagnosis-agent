@@ -123,6 +123,17 @@ function akMigrate(){
     if(KB.cfg.adminKeyHash!=null) KB.cfg.adminKeyHash=String(KB.cfg.adminKeyHash);
   }catch(e){}
 }
+/* 已退役的页面备注（主人 2026-11-06 定）：指标速填的括注与折叠标题重复，统一去掉
+   已存过旧备注的浏览器启动时就地清理，避免只改种子对老用户不生效 */
+var RETIRED_HINTS=['hintKpi'];
+function retireHints(){
+  try{
+    if(!KB||!KB.hints||!Array.isArray(KB.hints.items)) return;
+    var n=KB.hints.items.length;
+    KB.hints.items=KB.hints.items.filter(function(x){ return x&&RETIRED_HINTS.indexOf(x.id)<0; });
+    if(KB.hints.items.length!==n) KBDirty=true;
+  }catch(e){}
+}
 function bumpVer(){
   var p=String(KB.meta.ver||'2.0.0').split('.');
   p[2]=(parseInt(p[2]||0,10)+1);
@@ -2490,7 +2501,6 @@ function tabMds(t){
 function tabHints(t){
   var items=(KB.hints&&KB.hints.items)||[];
   var DEF={hintCover:'生成诊断后自动逐条核对子项覆盖情况；也可点下方「仅检查覆盖度」先单独跑一遍。',
-           hintKpi:'关键指标速填（选填 · 未填项自动按文本识别，识别不到则标不适用）',
            tipHold:'按住说话，松开结束。',
            phTx:'按下下方金色按钮说话。',
            phTx2:'录入项目经理补充的客户要求、项目痛点、项目亮点等。将用于提取「客户需求 / 项目痛点 / 项目亮点」。',
@@ -2958,7 +2968,7 @@ function clearAll(){
   $('jsonBox').style.display='none';
 }
 function boot(){
-  KB=loadKB(); akMigrate(); if(KBDirty){ saveKB(true); }   /* 旧的明文密钥就地转哈希 */
+  KB=loadKB(); akMigrate(); retireHints(); if(KBDirty){ saveKB(true); }   /* 旧明文密钥转哈希 + 退役备注清理 */
   buildIndex(); paintVer(); renderKpi(); count();
   $('kbVer').textContent='v'+KB.meta.ver+' · '+KB.meta.updated;
 

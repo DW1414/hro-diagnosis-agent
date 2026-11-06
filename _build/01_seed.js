@@ -436,7 +436,6 @@ window.__KB_SEED__ = {
          tx·tx2 占位语 / holdTip 按住说话提示 / coverTag 覆盖度标题旁小字。text 为空即不显示。 */
 "hints":{"items":[
  {"id":"hintCover","slot":"bCover","text":"生成诊断后自动逐条核对子项覆盖情况；也可点下方「仅检查覆盖度」先单独跑一遍。"},
- {"id":"hintKpi","slot":"bKpi","text":"关键指标速填（选填 · 未填项自动按文本识别，识别不到则标不适用）"},
  {"id":"tipHold","slot":"holdTip","text":"按住说话，松开结束。"},
  {"id":"phTx","slot":"tx","text":"按下下方金色按钮说话。"},
  {"id":"phTx2","slot":"tx2","text":"录入项目经理补充的客户要求、项目痛点、项目亮点等。将用于提取「客户需求 / 项目痛点 / 项目亮点」。"},
