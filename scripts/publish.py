@@ -215,6 +215,10 @@ else:
     else:
         print('  （语义版本未变，不打新 tag）')
     ok3, out3 = sh(['git', 'push', 'origin', 'HEAD', '--tags'])
+    if not ok3 and ('502' in out3 or 'Could not connect' in out3 or 'tunnel' in out3.lower()):
+        # 环境变量里的代理可能已失效（如 HTTP_PROXY 指向关闭的本地端口）——禁用代理直连重试一次
+        print('  ⚠ 经代理推送失败，尝试绕过代理直连…')
+        ok3, out3 = sh(['git', '-c', 'http.proxy=', '-c', 'https.proxy=', 'push', 'origin', 'HEAD', '--tags'])
     if ok3:
         print('  git push ✓（已触发 GitHub Actions 自动部署）')
     else:
