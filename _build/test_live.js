@@ -2,7 +2,12 @@
 const { chromium } = require('playwright-core');
 const PWD = require('./_pwd');
 const path = require('path');
+const fs = require('fs');
 const BASE = 'https://dw1414.github.io/hro-diagnosis-agent/';
+/* 版本断言改为自动读取，避免每次发版改测试 */
+const APPV = fs.readFileSync(path.join(__dirname, 'VERSION'), 'utf8').split(/\r?\n/)[0].trim();
+const KBV = (fs.readFileSync(path.join(__dirname, '01_seed.js'), 'utf8')
+  .match(/"ver"\s*:\s*"([^"]*)"/) || [])[1] || '';
 const res = [];
 function ck(n, v, extra) { res.push([n, !!v]); console.log((v ? 'PASS ' : 'FAIL ') + n + (extra ? '  ' + extra : '')); }
 const wait = ms => new Promise(r => setTimeout(r, ms));
@@ -21,14 +26,18 @@ const wait = ms => new Promise(r => setTimeout(r, ms));
     await wait(1200);
     ck('2 门禁解锁成功', await p.isVisible('#mName'));
     const appVer = await p.textContent('#appVer');
-    ck('3 页面显示程序版本号', (appVer || '').indexOf('程序 v2.3.0') >= 0, appVer);
+    ck('3 页面显示程序版本号', (appVer || '').indexOf('程序 v' + APPV) >= 0, appVer);
     const kbVer = await p.textContent('#kbVer');
-    ck('4 知识库版本正确', (kbVer || '').indexOf('2.2.5') >= 0, kbVer);
+    ck('4 知识库版本正确', (kbVer || '').indexOf(KBV) >= 0, kbVer);
     await wait(3000);
     const st = await p.evaluate(() => window.__hu.state());
     ck('5 热更状态=已是最新（不打扰）', st.state === 'current', JSON.stringify(st.state));
     ck('6 未弹更新条', !(await p.isVisible('#huBar')));
     await p.screenshot({ path: path.join(__dirname, 'live_online.png') });
+
+    /* 安全冒烟：线上页面源码里不得出现门禁明文口令 */
+    const src = await p.content();
+    ck('8 页面源码不含门禁明文', !PWD || src.indexOf(PWD) < 0);
 
     /* 冒烟：跑一份真实报告，确认线上程序可用 */
     await p.fill('#mName', '线上验收项目');
