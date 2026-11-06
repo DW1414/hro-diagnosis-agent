@@ -33,6 +33,10 @@ const RW_JSON = JSON.stringify({
 });
 
 function fetchStub(url, opt) {
+  if (String(url).indexOf('version.json') >= 0) {
+    /* 热更新模块的版本检查：与 AI 调用计数隔离 */
+    return Promise.resolve({ ok: false, status: 404, json: () => Promise.resolve({}) });
+  }
   CALLS.push({ url: url, body: opt && opt.body });
   if (MODE === 'cors') return Promise.reject(new TypeError('Failed to fetch'));
   if (MODE === '401') return Promise.resolve({ ok: false, status: 401, json: () => Promise.resolve({}) });

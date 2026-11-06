@@ -112,7 +112,7 @@
     var target = 'releases/' + encodeURIComponent(PIN) + '/';
     fetch(target + 'index.html', { method: 'HEAD', cache: 'no-store' })
       .then(function (r) {
-        if (r && r.ok) { location.replace(target); return; }
+        if (r && r.ok) { location.replace(target + '?pin=' + encodeURIComponent(PIN)); return; }
         pinBanner('未找到该版本，已停留在最新版');
       })
       .catch(function () { pinBanner('版本目录不可达，已停留在最新版'); });
@@ -170,6 +170,7 @@
   /* ---------------- 版本检查 ---------------- */
   function check(force) {
     if (isFile || !isHttp || !B) return Promise.resolve(null);
+    if (typeof fetch !== 'function') return Promise.resolve(null);   /* jsdom 等环境无 fetch */
     if (PIN) return Promise.resolve(null);              /* 钉住历史版本不检查 */
     var now = Date.now();
     if (!force && now - STATE.lastCheck < 10 * 60 * 1000) return Promise.resolve(STATE.latest);

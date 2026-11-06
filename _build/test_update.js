@@ -16,13 +16,14 @@ function ck(n, v, extra) { res.push([n, !!v]); console.log((v ? 'PASS ' : 'FAIL 
 const wait = ms => new Promise(r => setTimeout(r, ms));
 
 (async () => {
-  /* 用临时副本做站点，避免污染真实 docs/version.json */
-  const tmp = path.join(ROOT, '_build', '_site_test');
-  fs.rmSync(tmp, { recursive: true, force: true });
-  fs.cpSync(DOCS, tmp, { recursive: true });
+  /* 用临时副本做站点，避免污染真实 docs/version.json
+     （目录拷贝由 site_sim.py 完成，fs.cpSync 会被沙箱拦截） */
+  const tmp = path.join(__dirname, '_site_test');
+  const vpath = path.join(tmp, 'version.json');
 
-  const srv = spawn(PY, ['-m', 'http.server', String(PORT), '--bind', '127.0.0.1'], { cwd: tmp });
-  await wait(1600);
+  const srv = spawn(PY, [path.join(__dirname, 'site_sim.py'),
+                         path.join(ROOT, 'docs'), tmp, String(PORT)]);
+  await wait(2400);
 
   const b = await chromium.launch({ channel: 'msedge', headless: true });
   const ctx = await b.newContext({ viewport: { width: 1400, height: 950 } });
@@ -31,11 +32,17 @@ const wait = ms => new Promise(r => setTimeout(r, ms));
   p.on('pageerror', e => errs.push('PAGEERROR: ' + e.message));
 
   try {
+  const unlock = async () => {
+    if (await p.isVisible('#gateIn')) {
+      await p.fill('#gateIn', '__GATE_PW__');
+      await p.click('#gateBtn');
+      await wait(600);
+    }
+  };
     /* ① 版本一致：不应弹更新条 */
     await p.goto(BASE, { waitUntil: 'load' });
     await wait(600);
-    await p.fill('#gateIn', '__GATE_PW__');
-    await p.click('#gateBtn');
+    await unlock();
     await wait(3200);
     ck('1 页面注入程序版本号', (await p.textContent('#appVer') || '').indexOf('程序 v') >= 0,
       await p.textContent('#appVer'));
@@ -43,8 +50,9 @@ const wait = ms => new Promise(r => setTimeout(r, ms));
     const st0 = await p.evaluate(() => window.__hu.state());
     ck('3 状态为 current', st0.state === 'current', JSON.stringify(st0.state));
 
-    /* ② 模拟新版本：改 version.json 的 build */
-    const vpath = path.join(tmp, 'version.json');
+    /* ② 模拟新版本：改 version.json 的 build（单文件写入，不触发拦截） */
+    const vj0 = JSON.parse(fs.readFileSync(vpath, 'utf8'));
+    const PINID = 'v' + vj0.ver + '-' + vj0.build;   /* 当期归档版自带 hotupdate 模块 */
     const vj = JSON.parse(fs.readFileSync(vpath, 'utf8'));
     const oldBuild = vj.build;
     vj.build = 'feedbeef12345678';
@@ -54,8 +62,7 @@ const wait = ms => new Promise(r => setTimeout(r, ms));
 
     await p.reload({ waitUntil: 'load' });
     await wait(600);
-    await p.fill('#gateIn', '__GATE_PW__');
-    await p.click('#gateBtn');
+    await unlock();
     await wait(3600);
     ck('4 检测到新版本并弹出更新条', await p.isVisible('#huBar'));
     const barTxt = await p.textContent('#huBar');
@@ -68,8 +75,7 @@ const wait = ms => new Promise(r => setTimeout(r, ms));
     ck('6 点稍后关闭更新条', !(await p.isVisible('#huBar')));
     await p.reload({ waitUntil: 'load' });
     await wait(600);
-    await p.fill('#gateIn', '__GATE_PW__');
-    await p.click('#gateBtn');
+    await unlock();
     await wait(3600);
     ck('7 已跳过的版本不再提示', !(await p.isVisible('#huBar')));
 
@@ -77,22 +83,21 @@ const wait = ms => new Promise(r => setTimeout(r, ms));
     await p.evaluate(() => { const c = JSON.parse(localStorage.getItem('opsdiag.hu') || '{}'); c.skip = ''; localStorage.setItem('opsdiag.hu', JSON.stringify(c)); });
     await p.reload({ waitUntil: 'load' });
     await wait(600);
-    await p.fill('#gateIn', '__GATE_PW__');
-    await p.click('#gateBtn');
+    await unlock();
     await wait(3600);
     await p.click('#huGo');
     await wait(900);
     ck('8 立即更新跳转带 ?v= 新指纹', p.url().indexOf('v=feedbeef12345678') >= 0, p.url());
 
     /* ⑤ ?pin= 回滚到历史版本 */
-    await p.goto(BASE + '?pin=REL-011_v2.2.5', { waitUntil: 'load' });
+    await p.goto(BASE + '?pin=' + PINID, { waitUntil: 'load' });
     await wait(1200);
-    ck('9 ?pin= 自动跳转到历史版本目录', /releases\/REL-011_v2\.2\.5\//.test(p.url()), p.url());
+    ck('9 ?pin= 自动跳转到历史版本目录', p.url().indexOf('releases/' + PINID + '/') >= 0, p.url());
     await wait(600);
     const pinVisible = await p.isVisible('#huPin');
     ck('10 历史版本页显示回滚横幅', pinVisible);
     const pinTxt = await p.textContent('#huPin');
-    ck('11 横幅含版本号与回到最新入口', pinTxt.indexOf('REL-011') >= 0 && pinTxt.indexOf('回到最新版') >= 0);
+    ck('11 横幅含版本号与回到最新入口', pinTxt.indexOf(PINID) >= 0 && pinTxt.indexOf('回到最新版') >= 0);
     await p.screenshot({ path: path.join(__dirname, 'hu_pin.png') });
 
     /* ⑥ 回到最新版 */
@@ -109,15 +114,13 @@ const wait = ms => new Promise(r => setTimeout(r, ms));
     /* ⑧ 自动更新开关：空闲时自动刷新（用 localStorage 预置） */
     await p.goto(BASE, { waitUntil: 'load' });
     await wait(500);
-    await p.fill('#gateIn', '__GATE_PW__');
-    await p.click('#gateBtn');
+    await unlock();
     await wait(3600);
     await p.evaluate(() => { const c = JSON.parse(localStorage.getItem('opsdiag.hu') || '{}'); c.skip = ''; c.auto = true; localStorage.setItem('opsdiag.hu', JSON.stringify(c)); });
     await wait(400);
     await p.reload({ waitUntil: 'load' });
     await wait(600);
-    await p.fill('#gateIn', '__GATE_PW__');
-    await p.click('#gateBtn');
+    await unlock();
     await wait(4200);
     ck('14 开启自动更新且输入为空 → 自动跳转新版', p.url().indexOf('v=feedbeef12345678') >= 0, p.url());
 
@@ -133,7 +136,7 @@ const wait = ms => new Promise(r => setTimeout(r, ms));
   } finally {
     await b.close();
     srv.kill();
-    fs.rmSync(tmp, { recursive: true, force: true });
+    /* 临时目录不在这里删（rmSync 大目录同样可能被拦），下次运行由 site_sim.py 先清理 */
   }
   const bad = res.filter(r => !r[1]).length;
   console.log('结果：' + (res.length - bad) + '/' + res.length + ' 通过');

@@ -32,3 +32,4 @@ _build/dbg*.js
 _build/check_*.js
 _build/mock_last.json
 _build/kb_dump.json
+_build/verify_report.json
