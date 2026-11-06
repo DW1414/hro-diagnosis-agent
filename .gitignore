@@ -45,3 +45,9 @@ _build/verify_report.json
 .知识库结构梳理表.ref/
 factory-ops-diagnosis.html
 _build/.pwd
+
+# 重写前备份包，不入库
+_gitbackup_*.bundle
+
+# 重写前备份包，不入库
+_gitbackup_*.bundle
