@@ -85,7 +85,7 @@ for f in ['01_seed.js', '02_app.js', '03_admin.js', '05_llm.js', '06_update.js']
 suites = [
     ('核心功能 89 项',       ['node', '_build/test2.js'],      'tail'),
     ('访问门禁 15 项',       ['node', '_build/test_gate2.js'], 'tail'),
-    ('密钥与种子 21 项',     ['node', '_build/test_ak.js'],    'tail'),
+    ('密钥与种子 25 项',     ['node', '_build/test_ak.js'],    'tail'),
     ('AI 融合 31 项',        ['node', '_build/test_ai.js'],    'tail'),
     ('本地代理 9 项',        [sys.executable, '_build/test_proxy.py'], 'tail'),
 ]
