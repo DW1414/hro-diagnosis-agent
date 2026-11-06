@@ -1,5 +1,6 @@
 const fs=require('fs'),path=require('path'),{JSDOM}=require('jsdom');
 const html=fs.readFileSync(path.join(__dirname,'..','ops-diagnosis-agent.html'),'utf8');
+const AK=require('./_ak'),AKH=s=>require('crypto').createHash('sha256').update(String(s)).digest('hex');
 let pass=0,fail=0;
 function ok(c,msg){ if(c){pass++;console.log('  PASS '+msg);}else{fail++;console.log('  FAIL '+msg);} }
 
@@ -69,7 +70,7 @@ setTimeout(()=>{
     w.document.getElementById('adminKeyIn').value='wrong';
     w.document.getElementById('btnKeyGo').click();
     ok(!!w.document.getElementById('adminKeyIn'),'错误密钥仍停留在锁屏');
-    w.document.getElementById('adminKeyIn').value=w.__diag.getKB().cfg.adminKey;
+    w.document.getElementById('adminKeyIn').value=AK;
     w.document.getElementById('btnKeyGo').click();
     ok(!w.document.getElementById('adminKeyIn'),'正确密钥进入后台');
     ok(w.document.querySelectorAll('#mbody [data-tab]').length>=9,'页签数 '+w.document.querySelectorAll('#mbody [data-tab]').length+'（含布局/写作要求）');
@@ -148,8 +149,8 @@ setTimeout(()=>{
     let mApplied=[],mErrs=[];
     w.__diag.applyMd([{vol:'00',name:'00.md',txt:t00}],mErrs,(a,e)=>{mApplied=a;mErrs=e;});
     ok(mApplied.length>0,'MD 回写成功：'+mApplied.join('、'));
-    ok(w.__diag.getKB().cfg.adminKey==='mdtest999','MD 修改项已生效：adminKey='+w.__diag.getKB().cfg.adminKey);
-    w.__diag.getKB().cfg.adminKey='hro2026';
+    ok(w.__diag.getKB().cfg.adminKeyHash===AKH('mdtest999')&&!w.__diag.getKB().cfg.adminKey,'MD 写入的密钥已哈希化（哈希='+String(w.__diag.getKB().cfg.adminKeyHash).slice(0,12)+'…）');
+    w.__diag.getKB().cfg.adminKeyHash=AKH('hro2026');
     let m2=[],e2=[];
     w.__diag.applyMd([{vol:null,name:'bad.md',txt:'x'}],e2,(a,e)=>{m2=a;e2=e;});
     ok(m2.length===0&&e2.length===1,'无卷标记文件被安全跳过：'+e2[0]);

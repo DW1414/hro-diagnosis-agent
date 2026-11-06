@@ -36,7 +36,7 @@ const AK = require('./_ak');   /* 管理员密钥从种子正则读取，不落�
   await p.click('#btnKeyGo');
   await p.waitForTimeout(500);
   const A5 = await p.evaluate(() => !!document.querySelector('#mbody [data-tab="layout"]'));
-  const adminKey = await p.evaluate(() => (window.__diag && window.__diag.getKB().cfg.adminKey) || '');
+  const adminKeyHash = await p.evaluate(() => (window.__diag && window.__diag.getKB().cfg.adminKeyHash) || '');
 
   await p.reload({ waitUntil: 'load' });
   await p.waitForTimeout(600);
@@ -51,7 +51,7 @@ const AK = require('./_ak');   /* 管理员密钥从种子正则读取，不落�
     ['6 解锁后出现锁定按钮', A4],
     ['7 解锁后恢复滚动', overflowBack === ''],
     ['8 管理员新密钥通过', A5],
-    ['9 知识库 adminKey 已更新', adminKey === AK],
+    ['9 知识库密钥已哈希保存', adminKeyHash === require('crypto').createHash('sha256').update(AK).digest('hex')],
     ['10 记住本机：刷新免密', A6]
   ];
   let bad = 0;

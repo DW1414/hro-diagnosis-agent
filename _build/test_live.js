@@ -38,6 +38,8 @@ const wait = ms => new Promise(r => setTimeout(r, ms));
     /* 安全冒烟：线上页面源码里不得出现门禁明文口令 */
     const src = await p.content();
     ck('8 页面源码不含门禁明文', !PWD || src.indexOf(PWD) < 0);
+    const AKV = require('./_ak');
+    ck('9 页面源码不含管理员密钥明文', !AKV || src.indexOf(AKV) < 0);
 
     /* 冒烟：跑一份真实报告，确认线上程序可用 */
     await p.fill('#mName', '线上验收项目');

@@ -51,3 +51,6 @@ _gitbackup_*.bundle
 
 # 重写前备份包，不入库
 _gitbackup_*.bundle
+
+# 管理员密钥明文（仅本机测试用）
+_build/.ak

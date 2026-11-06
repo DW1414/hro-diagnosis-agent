@@ -60,6 +60,69 @@ function saveKB(silent){
     paintVer(); return true;
   }catch(e){ toast('保存失败：'+e.message); return false; }
 }
+/* ---------------- 管理员密钥：只存哈希，源码与导出文档均不出现明文 ----------------
+   主人 2026-11-06 定（甲方案）：adminKey 不落明文。用同步 SHA-256（不依赖 crypto.subtle，
+   file:// 与 jsdom 环境同样可用），32 位 FNV 只用于访问门禁，密钥校验用 SHA-256 更强。 */
+function _rotr(x,n){ return ((x>>>n)|(x<<(32-n)))>>>0; }
+function sha256hex(str){
+  var K=[0x428a2f98,0x71374491,0xb5c0fbcf,0xe9b5dba5,0x3956c25b,0x59f111f1,0x923f82a4,0xab1c5ed5,
+         0xd807aa98,0x12835b01,0x243185be,0x550c7dc3,0x72be5d74,0x80deb1fe,0x9bdc06a7,0xc19bf174,
+         0xe49b69c1,0xefbe4786,0x0fc19dc6,0x240ca1cc,0x2de92c6f,0x4a7484aa,0x5cb0a9dc,0x76f988da,
+         0x983e5152,0xa831c66d,0xb00327c8,0xbf597fc7,0xc6e00bf3,0xd5a79147,0x06ca6351,0x14292967,
+         0x27b70a85,0x2e1b2138,0x4d2c6dfc,0x53380d13,0x650a7354,0x766a0abb,0x81c2c92e,0x92722c85,
+         0xa2bfe8a1,0xa81a664b,0xc24b8b70,0xc76c51a3,0xd192e819,0xd6990624,0xf40e3585,0x106aa070,
+         0x19a4c116,0x1e376c08,0x2748774c,0x34b0bcb5,0x391c0cb3,0x4ed8aa4a,0x5b9cca4f,0x682e6ff3,
+         0x748f82ee,0x78a5636f,0x84c87814,0x8cc70208,0x90befffa,0xa4506ceb,0xbef9a3f7,0xc67178f2];
+  var H=[0x6a09e667,0xbb67ae85,0x3c6ef372,0xa54ff53a,0x510e527f,0x9b05688c,0x1f83d9ab,0x5be0cd19];
+  var bytes=[],i,c;
+  for(i=0;i<str.length;i++){
+    c=str.charCodeAt(i);
+    if(c<0x80) bytes.push(c);
+    else if(c<0x800) bytes.push(0xc0|(c>>6),0x80|(c&63));
+    else if(c>=0xd800&&c<0xdc00&&i+1<str.length){
+      var c2=str.charCodeAt(++i),cp=0x10000+((c-0xd800)<<10)+(c2-0xdc00);
+      bytes.push(0xf0|(cp>>18),0x80|((cp>>12)&63),0x80|((cp>>6)&63),0x80|(cp&63));
+    } else bytes.push(0xe0|(c>>12),0x80|((c>>6)&63),0x80|(c&63));
+  }
+  var len=bytes.length*8;
+  bytes.push(0x80);
+  while(bytes.length%64!==56) bytes.push(0);
+  bytes.push(0,0,0,0,(len>>>24)&255,(len>>>16)&255,(len>>>8)&255,len&255);
+  var w=new Array(64);
+  for(var off=0;off<bytes.length;off+=64){
+    for(i=0;i<16;i++) w[i]=((bytes[off+i*4]<<24)|(bytes[off+i*4+1]<<16)|(bytes[off+i*4+2]<<8)|bytes[off+i*4+3])>>>0;
+    for(i=16;i<64;i++){
+      var x=w[i-15],y=w[i-2];
+      var s0=(_rotr(x,7)^_rotr(x,18)^(x>>>3))>>>0, s1=(_rotr(y,17)^_rotr(y,19)^(y>>>10))>>>0;
+      w[i]=(w[i-16]+s0+w[i-7]+s1)>>>0;
+    }
+    var a=H[0],b=H[1],cc=H[2],d=H[3],e=H[4],f=H[5],g2=H[6],h=H[7];
+    for(i=0;i<64;i++){
+      var S1=(_rotr(e,6)^_rotr(e,11)^_rotr(e,25))>>>0, ch=((e&f)^((~e)&g2))>>>0;
+      var t1=(h+S1+ch+K[i]+w[i])>>>0;
+      var S0=(_rotr(a,2)^_rotr(a,13)^_rotr(a,22))>>>0, mj=((a&b)^(a&cc)^(b&cc))>>>0;
+      var t2=(S0+mj)>>>0;
+      h=g2;g2=f;f=e;e=(d+t1)>>>0;d=cc;cc=b;b=a;a=(t1+t2)>>>0;
+    }
+    H[0]=(H[0]+a)>>>0;H[1]=(H[1]+b)>>>0;H[2]=(H[2]+cc)>>>0;H[3]=(H[3]+d)>>>0;
+    H[4]=(H[4]+e)>>>0;H[5]=(H[5]+f)>>>0;H[6]=(H[6]+g2)>>>0;H[7]=(H[7]+h)>>>0;
+  }
+  return H.map(function(v){ return ('00000000'+v.toString(16)).slice(-8); }).join('');
+}
+window.__sha256=sha256hex;
+function akHash(s){ return sha256hex(String(s==null?'':s)); }
+/* 旧版知识库里若存过明文 adminKey：明文一律作废并删除，密钥回落到种子哈希
+   （避免把已泄露的外部口令继续当钥匙；主人 2026-11-06 确认按此处理） */
+function akMigrate(){
+  try{
+    if(!KB||!KB.cfg) return;
+    if(KB.cfg.adminKey!=null && String(KB.cfg.adminKey)!==''){
+      if(!KB.cfg.adminKeyHash) KB.cfg.adminKeyHash=akHash(KB.cfg.adminKey);
+      delete KB.cfg.adminKey; KBDirty=true;
+    }
+    if(KB.cfg.adminKeyHash!=null) KB.cfg.adminKeyHash=String(KB.cfg.adminKeyHash);
+  }catch(e){}
+}
 function bumpVer(){
   var p=String(KB.meta.ver||'2.0.0').split('.');
   p[2]=(parseInt(p[2]||0,10)+1);
@@ -1246,6 +1309,25 @@ function dl(name,txt,type){
   var b=new Blob([txt],{type:type||'text/plain;charset=utf-8'}),u=URL.createObjectURL(b),a=document.createElement('a');
   a.href=u;a.download=name;document.body.appendChild(a);a.click();setTimeout(function(){URL.revokeObjectURL(u);a.remove();},400);
 }
+/* 导出种子（发版用）：把本机当前知识库序列化成 01_seed.js，交给管理员发布到云端程序
+   主人 2026-11-06 定（甲方案：半自动发版）——后台改完 → 导出 → 发版 → 所有人下次打开即最新 */
+function seedText(){
+  var o=JSON.parse(JSON.stringify(KB));
+  if(o.cfg){ delete o.cfg.adminKey; }              /* 双保险：明文密钥绝不外带 */
+  o.meta=o.meta||{};
+  o.meta.ver=String(o.meta.ver||'2.0.0');
+  o.meta.schema=Number(o.meta.schema||1);
+  o.meta.updated=ymd();
+  return '/* 知识库种子 —— 由后台「导出种子（发版用）」生成 '+ymd()+'，用于发布到云端程序 */\n'
+    +'window.__KB_SEED__ = '+JSON.stringify(o,null,1)+';\n';
+}
+function exportSeed(){
+  try{
+    var txt=seedText();
+    dl('01_seed.js',txt,'application/javascript;charset=utf-8');
+    toast('已导出 01_seed.js（v'+KB.meta.ver+'），交给管理员发版即可');
+  }catch(e){ toast('导出失败：'+e.message); }
+}
 function reportHtml(){
   var css=Array.prototype.slice.call(document.styleSheets).length;
   return '<!doctype html><html lang="zh-CN"><head><meta charset="utf-8"><title>'+esc(R.meta.name)+' 项目运营诊断报告</title>'
@@ -1305,7 +1387,10 @@ function renderLock(){
 }
 function tryKey(){
   var v=($('adminKeyIn').value||'').trim();
-  if(v && v===String(KB.cfg.adminKey||'')){
+  /* 只做哈希比对：页面源码与导出文档里都没有明文密钥（主人 2026-11-06 定） */
+  var okv=false;
+  try{ okv=!!(v && KB.cfg && KB.cfg.adminKeyHash && akHash(v)===String(KB.cfg.adminKeyHash)); }catch(e){}
+  if(okv){
     adminOK=true;
     var h=$('mhead'); if(h) Array.prototype.forEach.call(h.querySelectorAll('button'),function(b){ b.style.display=''; });
     $('adminState').textContent='当前 v'+KB.meta.ver+' · 更新于 '+KB.meta.updated;
@@ -1324,7 +1409,7 @@ function mdVols(){
   +'- 名称：'+KB.meta.name+'\n- 版本：'+KB.meta.ver+'\n- 更新日期：'+KB.meta.updated+'\n'
   +'- 免责声明：'+KB.cfg.simTag+'\n- 总分公式：'+KB.cfg.totalFormula+'\n- K折算公式：'+KB.cfg.kFormula+'\n'
   +'- 成熟度分级：'+(KB.cfg.grading?'开启':'关闭')+'\n- IT措施缺口说明：'+KB.cfg.pendingITNote+'\n'
-  +'- 管理员密钥：'+KB.cfg.adminKey+'\n\n'
+  +'- 管理员密钥：不随文档导出（仅存哈希；需修改请在后台「概览与总控」重设）\n\n'
    +'## 整改标签（8 分类，严格使用，不可自定义）\n| 代码 | 简写 | 名称 | 颜色 |\n|---|---|---|---|\n';
   KB.tags.forEach(function(t){ s0+='| '+t.code+' | '+t.short+' | '+t.name+' | '+t.color+' |\n'; });
   SEC['00']=s0;
@@ -1580,7 +1665,8 @@ function applyMd(jobs,errs,done){
         if(g('K折算公式')) KB.cfg.kFormula=g('K折算公式');
         if(g('成熟度分级')) KB.cfg.grading=/开启/.test(g('成熟度分级'));
         if(g('IT措施缺口说明')) KB.cfg.pendingITNote=g('IT措施缺口说明');
-        if(g('管理员密钥')) KB.cfg.adminKey=g('管理员密钥');
+        var _ak=g('管理员密钥');
+        if(_ak && !/不随文档导出|已哈希/.test(_ak)){ KB.cfg.adminKeyHash=akHash(_ak); delete KB.cfg.adminKey; }
         var tb=t.match(/## 整改标签[\s\S]*?\n\|---\|[\s\S]*?\n([\s\S]*?)(?:\n\n|$)/);
         if(tb){
           var tags=[];
@@ -2595,8 +2681,30 @@ function tabMeta(t){
    +'</div>'
    +'<div class="warnbox"><b>成熟度分级：</b>'+(KB.cfg.grading?'已启用':'当前关闭（主人 2026-10-19 确认：只输出总得分，不分级）')+'　'+esc(KB.cfg.gradingNote||'')+'</div>'
    +'<div class="warnbox"><b>四维覆盖范围：</b>'+KB.aspects.map(function(a){return a.code+' '+a.name+'（'+a.items.length+'）';}).join(' / ')
-   +'　|　措施卡 '+IDX.acts.length+' 张　|　知识点 '+(IDX.kp?Object.keys(IDX.kp).length:0)+' 条</div>';
+   +'　|　措施卡 '+IDX.acts.length+' 张　|　知识点 '+(IDX.kp?Object.keys(IDX.kp).length:0)+' 条</div>'
+   +'<div class="actcard"><div class="t">管理员入口密钥</div>'
+   +'<div style="font-size:12px;color:#9aa7b4;margin-bottom:8px">当前状态：'
+   +(KB.cfg.adminKeyHash?'<b style="color:#7fd8a6">已设置（仅存 SHA-256 哈希，页面源码与导出文档里都没有明文）</b>'
+                       :'<b style="color:#f0b46a">未设置</b>')
+   +'</div>'
+   +'<div class="field"><label>重设密钥（留空则不修改）</label><input id="akNew" type="password" placeholder="输入新密钥后点右侧按钮" style="max-width:320px" /></div>'
+   +'<div style="margin-top:8px"><button class="btn teal sm" id="akSet" type="button">保存密钥</button>'
+   +'<span style="font-size:11.5px;color:#8b96a3;margin-left:8px">保存后只留哈希；请自行记牢，忘记只能通过 MD 导入重设</span></div></div>'
+   +'<div class="actcard"><div class="t">发布到云端程序（半自动发版）</div>'
+   +'<div style="font-size:12px;color:#9aa7b4;margin-bottom:8px">后台改完知识库 → 点下面导出 → 把得到的 <b>01_seed.js</b> 交给管理员发版 → 程序热更提示，所有人下次打开即最新。</div>'
+   +'<button class="btn sm" id="btnSeed" type="button">导出种子（发版用）</button>'
+   +'<span style="font-size:11.5px;color:#8b96a3;margin-left:8px">导出内容 = 本机当前知识库全量（不含明文密钥）</span></div>';
   bindFields(t);
+  var _akb=$('akSet');
+  if(_akb) _akb.addEventListener('click',function(){
+    var v=($('akNew').value||'').trim();
+    if(!v){ toast('未输入新密钥，未做修改'); return; }
+    if(v.length<6){ toast('密钥太短，建议 8 位以上'); return; }
+    KB.cfg.adminKeyHash=akHash(v); delete KB.cfg.adminKey;
+    KBDirty=true; saveKB(true); adminRender(); toast('管理员密钥已更新（仅存哈希）');
+  });
+  var _sb=$('btnSeed');
+  if(_sb) _sb.addEventListener('click',exportSeed);
 }
 function tabDims(t){
   var h='';
@@ -2850,7 +2958,8 @@ function clearAll(){
   $('jsonBox').style.display='none';
 }
 function boot(){
-  KB=loadKB(); buildIndex(); paintVer(); renderKpi(); count();
+  KB=loadKB(); akMigrate(); if(KBDirty){ saveKB(true); }   /* 旧的明文密钥就地转哈希 */
+  buildIndex(); paintVer(); renderKpi(); count();
   $('kbVer').textContent='v'+KB.meta.ver+' · '+KB.meta.updated;
 
   $('tx').addEventListener('input',count);
@@ -2900,6 +3009,7 @@ function boot(){
 }
 if(document.readyState==='loading') document.addEventListener('DOMContentLoaded',boot); else boot();
 window.__diag={run:run,getKB:function(){return KB;},getR:function(){return R;},mdVols:mdVols,applyMd:applyMd,applyLayout:applyLayout,reportHtml:reportHtml,
+  seedText:seedText, akHash:akHash, akMigrate:akMigrate,
   buildCover:function(){return buildCover(LAST.D,LAST.S);},askList:askList,coverStat:function(){return CV?CV.stat:null;},
   judge:judge,methodsFor:methodsFor,scanRedFlags:scanRedFlags,buildEvals:buildEvals,
   /* 2026-10-27 新增：供 AI 增强模块（05_llm.js）调用的接口 */

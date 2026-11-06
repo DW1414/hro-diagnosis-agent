@@ -45,7 +45,7 @@ function ck(name, v) { res.push([name, !!v]); }
 
   // —— 场景2：管理员新密钥 ——
   const kb = w1.__diag && w1.__diag.getKB();
-  ck('10 知识库 adminKey 已更新', kb && kb.cfg.adminKey === AK);
+  ck('10 知识库密钥已哈希保存', kb && kb.cfg.adminKeyHash === require('crypto').createHash('sha256').update(AK).digest('hex') && !kb.cfg.adminKey);
   D1.getElementById('btnAdmin').dispatchEvent(new w1.MouseEvent('click', { bubbles: true }));
   await wait(300);
   const keyIn = D1.getElementById('adminKeyIn');
