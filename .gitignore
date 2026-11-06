@@ -33,3 +33,14 @@ _build/check_*.js
 _build/mock_last.json
 _build/kb_dump.json
 _build/verify_report.json
+
+# ===== 知识库不进仓库（主人 2026-11-06 定）=====
+# 知识库运行时数据在本机浏览器；源文件在本地维护与 _releases 快照回滚
+# 程序后台「MD 文件库」手动上传更新，程序自动匹配 —— 与 Git 仓库无关
+知识库_v2_MD/
+知识库结构梳理表.xlsx
+知识库清单_v2.md
+知识库结构设计_v2.md
+智能体与知识库需求基线_v1.md
+.知识库结构梳理表.ref/
+factory-ops-diagnosis.html
