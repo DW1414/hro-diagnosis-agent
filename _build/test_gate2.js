@@ -5,6 +5,7 @@ const path = require('path');
 const { JSDOM } = require('jsdom');
 const HTML = fs.readFileSync(path.resolve(__dirname, '..', 'ops-diagnosis-agent.html'), 'utf8');
 const PW = PWD;
+const AK = require('./_ak');   /* 管理员密钥从种子正则读取，不落明文 */
 const OK = 2877810214;
 const URL = 'https://local.test/';
 
@@ -44,13 +45,13 @@ function ck(name, v) { res.push([name, !!v]); }
 
   // —— 场景2：管理员新密钥 ——
   const kb = w1.__diag && w1.__diag.getKB();
-  ck('10 知识库 adminKey 已更新', kb && kb.cfg.adminKey === 'Ops2026#KB');
+  ck('10 知识库 adminKey 已更新', kb && kb.cfg.adminKey === AK);
   D1.getElementById('btnAdmin').dispatchEvent(new w1.MouseEvent('click', { bubbles: true }));
   await wait(300);
   const keyIn = D1.getElementById('adminKeyIn');
   ck('11 弹出管理员密钥验证', !!keyIn);
   if (keyIn) {
-    keyIn.value = 'Ops2026#KB';
+    keyIn.value = AK;
     D1.getElementById('btnKeyGo').dispatchEvent(new w1.MouseEvent('click', { bubbles: true }));
     await wait(300);
     ck('12 新密钥验证通过进后台', !!D1.querySelector('#mbody [data-tab="layout"]'));

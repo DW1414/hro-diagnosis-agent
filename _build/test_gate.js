@@ -1,7 +1,8 @@
 const { chromium } = require('playwright-core');
 const path = require('path');
 const FILE = 'file:///' + path.resolve(__dirname, '..', 'ops-diagnosis-agent.html').replace(/\\/g, '/');
-const PW = '__GATE_PW__';
+const PW = require('./_pwd');
+const AK = require('./_ak');   /* 管理员密钥从种子正则读取，不落明文 */
 (async () => {
   const b = await chromium.launch({ channel: 'msedge', headless: true });
   const p = await b.newPage({ viewport: { width: 1440, height: 1000 } });
@@ -31,7 +32,7 @@ const PW = '__GATE_PW__';
 
   await p.click('#btnAdmin');
   await p.waitForTimeout(400);
-  await p.fill('#adminKeyIn', 'Ops2026#KB');
+  await p.fill('#adminKeyIn', AK);
   await p.click('#btnKeyGo');
   await p.waitForTimeout(500);
   const A5 = await p.evaluate(() => !!document.querySelector('#mbody [data-tab="layout"]'));
@@ -49,8 +50,8 @@ const PW = '__GATE_PW__';
     ['5 正确密码可进入', A3],
     ['6 解锁后出现锁定按钮', A4],
     ['7 解锁后恢复滚动', overflowBack === ''],
-    ['8 管理员新密钥 Ops2026#KB 通过', A5],
-    ['9 知识库 adminKey 已更新', adminKey === 'Ops2026#KB'],
+    ['8 管理员新密钥通过', A5],
+    ['9 知识库 adminKey 已更新', adminKey === AK],
     ['10 记住本机：刷新免密', A6]
   ];
   let bad = 0;

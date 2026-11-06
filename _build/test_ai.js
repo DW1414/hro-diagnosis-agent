@@ -6,6 +6,7 @@ const path = require('path');
 const { JSDOM } = require('jsdom');
 const HTML = fs.readFileSync(path.resolve(__dirname, '..', 'ops-diagnosis-agent.html'), 'utf8');
 const URL = 'https://local.test/';
+const AK = require('./_ak');   /* 管理员密钥从种子正则读取，不落明文 */
 const res = [];
 function ck(n, v, extra) { res.push([n, !!v]); console.log((v ? 'PASS ' : 'FAIL ') + n + (extra ? '  ' + extra : '')); }
 function wait(ms) { return new Promise(r => setTimeout(r, ms)); }
@@ -169,7 +170,7 @@ function fetchStub(url, opt) {
   /* 后台已无 AI 页签 */
   D.getElementById('btnAdmin').dispatchEvent(new w.MouseEvent('click', { bubbles: true }));
   await wait(300);
-  D.getElementById('adminKeyIn').value = 'Ops2026#KB';
+  D.getElementById('adminKeyIn').value = AK;
   D.getElementById('btnKeyGo').dispatchEvent(new w.MouseEvent('click', { bubbles: true }));
   await wait(300);
   ck('29 管理员后台已无 AI 页签', !D.querySelector('#mbody [data-tab="ai"]'));
