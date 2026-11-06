@@ -1,5 +1,6 @@
 /* 线上站点验收：门禁 → 版本号 → 热更状态 → 截图 */
 const { chromium } = require('playwright-core');
+const PWD = require('./_pwd');
 const path = require('path');
 const BASE = 'https://dw1414.github.io/hro-diagnosis-agent/';
 const res = [];
@@ -15,7 +16,7 @@ const wait = ms => new Promise(r => setTimeout(r, ms));
     await p.goto(BASE, { waitUntil: 'load', timeout: 60000 });
     await wait(800);
     ck('1 线上页面打开（门禁出现）', await p.isVisible('#gateIn'));
-    await p.fill('#gateIn', '__GATE_PW__');
+    await p.fill('#gateIn', PWD);
     await p.click('#gateBtn');
     await wait(1200);
     ck('2 门禁解锁成功', await p.isVisible('#mName'));

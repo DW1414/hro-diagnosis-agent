@@ -2,6 +2,7 @@
    覆盖：① 版本一致时不打扰 ② 新版本出现更新浮条 ③ 立即更新带 ?v= 穿透缓存
         ④ ?pin= 跳转历史版本并显示横幅 ⑤ file:// 静默不报错 ⑥ 自动更新仅在空闲时执行 */
 const { chromium } = require('playwright-core');
+const PWD = require('./_pwd');
 const path = require('path');
 const fs = require('fs');
 const { spawn } = require('child_process');
@@ -34,7 +35,7 @@ const wait = ms => new Promise(r => setTimeout(r, ms));
   try {
   const unlock = async () => {
     if (await p.isVisible('#gateIn')) {
-      await p.fill('#gateIn', '__GATE_PW__');
+      await p.fill('#gateIn', PWD);
       await p.click('#gateBtn');
       await wait(600);
     }

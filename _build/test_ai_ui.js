@@ -1,6 +1,7 @@
 /* AI 增强 · 融入报告版真实链路实测（页面 → 本地代理 → 模拟上游）+ 截图目检
    验收：AI 内容不再单独列出，直接融入报告；建议项标「知识库 / 大模型」出处。 */
 const { chromium } = require('playwright-core');
+const PWD = require('./_pwd');
 const path = require('path');
 const { spawn } = require('child_process');
 const FILE = 'file:///' + path.resolve(__dirname, '..', 'ops-diagnosis-agent.html').replace(/\\/g, '/');
@@ -28,7 +29,7 @@ const TEXT = '走访客户：苏州精控电子有限公司。项目经理张伟
   try {
     await p.goto(FILE, { waitUntil: 'load' });
     await wait(500);
-    await p.fill('#gateIn', '__GATE_PW__');
+    await p.fill('#gateIn', PWD);
     await p.click('#gateBtn');
     await wait(500);
 

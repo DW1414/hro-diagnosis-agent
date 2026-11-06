@@ -1,5 +1,6 @@
 /* 融入报告版干净截图：整改表双出处 + 模块三 AI 归纳 */
 const { chromium } = require('playwright-core');
+const PWD = require('./_pwd');
 const path = require('path');
 const { spawn } = require('child_process');
 const FILE = 'file:///' + path.resolve(__dirname, '..', 'ops-diagnosis-agent.html').replace(/\\/g, '/');
@@ -19,7 +20,7 @@ const TEXT = '走访客户：苏州精控电子有限公司。项目经理张伟
   try {
     await p.goto(FILE, { waitUntil: 'load' });
     await wait(500);
-    await p.fill('#gateIn', '__GATE_PW__');
+    await p.fill('#gateIn', PWD);
     await p.click('#gateBtn');
     await wait(500);
     await p.fill('#mName', '华东智能制造外包项目');

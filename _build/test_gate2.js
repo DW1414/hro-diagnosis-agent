@@ -1,9 +1,10 @@
 /* 门禁 + 管理员密钥 E2E（jsdom） */
 const fs = require('fs');
+const PWD = require('./_pwd');
 const path = require('path');
 const { JSDOM } = require('jsdom');
 const HTML = fs.readFileSync(path.resolve(__dirname, '..', 'ops-diagnosis-agent.html'), 'utf8');
-const PW = '__GATE_PW__';
+const PW = PWD;
 const OK = 2877810214;
 const URL = 'https://local.test/';
 
