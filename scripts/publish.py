@@ -196,6 +196,19 @@ msg = 'release v%s (%s)\n\n%s\n\n验证：%s' % (
     '；'.join('%s %s' % (n, '✓' if o else '✗') for n, o, _ in checks[:8]))
 print('  git add -A ✓' if ok else '  ✗ git add 失败')
 
+# —— 提交前安检（主人 2026-11-09 定）：知识库/素材/内部交付物严禁入库，命中即中止 ——
+BLOCK_PATTERNS = ['_kb_intake/', '知识库', '_gitbackup_', '新品发布汇报/', '.workbuddy/', '01_seed.v']
+_ok, _staged = sh(['git', 'diff', '--cached', '--name-only'])
+_bad = [l for l in (_staged or '').splitlines() if any(p in l for p in BLOCK_PATTERNS)]
+if _bad:
+    print('  ✗ 安检拦截：以下禁入文件出现在暂存区，已中止发布（请检查 .gitignore）：')
+    for b in _bad[:10]:
+        print('    ' + b)
+    if len(_bad) > 10:
+        print('    … 共 %d 个' % len(_bad))
+    sys.exit(1)
+print('  安检通过：暂存区无禁入文件 ✓')
+
 if DRY:
     print('  [dry-run] commit -m "' + msg.splitlines()[0] + '…"')
 else:
