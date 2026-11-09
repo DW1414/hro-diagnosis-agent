@@ -38,6 +38,7 @@ _build/verify_report.json
 # 知识库运行时数据在本机浏览器；源文件在本地维护与 _releases 快照回滚
 # 程序后台「MD 文件库」手动上传更新，程序自动匹配 —— 与 Git 仓库无关
 知识库_v2_MD/
+知识库_v2_MD.bak_*/
 知识库结构梳理表.xlsx
 知识库清单_v2.md
 知识库结构设计_v2.md
@@ -45,6 +46,15 @@ _build/verify_report.json
 .知识库结构梳理表.ref/
 factory-ops-diagnosis.html
 _build/.pwd
+
+# 知识库扩容工作区：含素材库原文提取文本（未脱敏），严禁入库（主人 2026-11-09 定）
+_kb_intake/
+
+# 旧版本种子备份（本地回滚资产，不入库）
+_build/01_seed.v*.js
+
+# 内部交付物（PPT/文档项目），不入库
+新品发布汇报/
 
 # 重写前备份包，不入库
 _gitbackup_*.bundle
