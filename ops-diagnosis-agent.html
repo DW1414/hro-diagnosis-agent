@@ -219,7 +219,7 @@ tr.tbd td{background:#fdf6e8}
 </head>
 <body>
 <!--APPBUILD:START-->
-<script id="appbuild">window.__APP_BUILD__={"ver":"2.3.3","build":"ff41a9d2c178dcd0","kbVer":"2.3.0","kbSchema":1};</script>
+<script id="appbuild">window.__APP_BUILD__={"ver":"2.3.3","build":"bac15ed75730ed86","kbVer":"2.3.0","kbSchema":1};</script>
 <!--APPBUILD:END-->
 <!--GATE:START-->
 <!-- ===== 访问门禁（离线校验，密码不以明文出现在源码中） ===== -->
@@ -9469,7 +9469,7 @@ function tabLayout(t){
 function tabMds(t){
   var all=mdFilesAll(), st=KB.mdState||{}, live=mdFiles();
   var V=mdVols(), Vmap={}; V.forEach(function(x){ Vmap[x[0]]=x[1]; });
-  var h='<div class="actcard"><div class="t">MD 文件库 · 智能体当前调用的全部知识库文档</div>'
+  var h='<div class="actcard" style="margin-bottom:10px"><div class="t">MD 文件库 · 智能体当前调用的全部知识库文档</div>'
    +'<div class="d" style="margin-bottom:10px">共 <b>'+all.length+'</b> 个文件，启用 <b>'+live.length+'</b> 个。'
    +'MD 内容由知识库<b>实时生成</b>，改完后台内容此处即可见；上传 MD 会自动按 <code>&lt;!--KBVOL:NN--&gt;</code> 分节回写对应知识节点、版本 +0.0.1 并记变更日志。'
    +'内置文件「删除」为<b>停用</b>（不再导出，可一键恢复），自定义文件删除后重新上传即可恢复。</div></div>'
@@ -9593,7 +9593,7 @@ function tabHints(t){
            phTx:'按下下方金色按钮说话。',
            phTx2:'录入项目经理补充的客户要求、项目痛点、项目亮点等。将用于提取「客户需求 / 项目痛点 / 项目亮点」。',
            noteCover:'按知识库子项逐条核对'};
-  var h='<div class="actcard"><div class="t">页面备注 · 页面上的提示文字全部可增改</div>'
+  var h='<div class="actcard" style="margin-bottom:10px"><div class="t">页面备注 · 页面上的提示文字全部可增改</div>'
    +'<div class="d" style="margin-bottom:10px"><b>边改边生效</b>：输入框里一改，页面立刻跟着变，并自动存本机（无需手动保存）；'
    +'点「保存该条 / 保存全部」会额外升版本号并记变更日志。<b>清空文本 = 该处不显示</b>（如已删掉的「评分口径」说明）。'
    +'也可在任意区块新增自定义备注。</div></div>'
@@ -9785,10 +9785,10 @@ function tabMeta(t){
    +(KB.cfg.adminKeyHash?'<b style="color:#7fd8a6">已设置（仅存 SHA-256 哈希，页面源码与导出文档里都没有明文）</b>'
                        :'<b style="color:#f0b46a">未设置</b>')
    +'</div>'
-   +'<div class="field"><label>① 原密钥（身份验证，必填）</label><input id="akOld" type="password" placeholder="输入当前正在使用的管理员密钥" style="max-width:320px" /></div>'
+   +'<div class="field"><label>① 原密钥（身份验证，必填）</label><div style="display:flex;align-items:center;gap:8px;max-width:420px"><input id="akOld" type="password" placeholder="输入当前正在使用的管理员密钥" style="flex:1" /><span id="akOldState" style="font-size:12px;white-space:nowrap"></span></div></div>'
    +'<div style="display:flex;gap:12px;flex-wrap:wrap;margin-top:6px;max-width:520px">'
-   +'<div class="field" style="flex:1;min-width:150px"><label>② 新密钥</label><input id="akNew" type="password" placeholder="输入新密钥" /></div>'
-   +'<div class="field" style="flex:1;min-width:150px"><label>③ 确认新密钥</label><input id="akNew2" type="password" placeholder="再输入一次，须完全一致" /></div></div>'
+   +'<div class="field" style="flex:1;min-width:150px"><label>② 新密钥</label><input id="akNew" type="password" placeholder="输入新密钥" /><span id="akNewState" style="font-size:11.5px;display:block;margin-top:4px;min-height:16px"></span></div>'
+   +'<div class="field" style="flex:1;min-width:150px"><label>③ 确认新密钥</label><input id="akNew2" type="password" placeholder="再输入一次，须完全一致" /><span id="akNew2State" style="font-size:11.5px;display:block;margin-top:4px;min-height:16px"></span></div></div>'
    +'<div style="margin-top:8px"><button class="btn teal sm" id="akSet" type="button">保存密钥</button>'
    +'<span style="font-size:11.5px;color:#8b96a3;margin-left:8px">原密钥验证通过 + 两次新密钥一致方可保存；只留哈希，忘记只能通过 MD 导入重设</span></div></div>';
   bindFields(t);
@@ -9801,10 +9801,23 @@ function tabMeta(t){
     }
     if(!v){ toast('未输入新密钥，未做修改'); return; }
     if(v.length<6){ toast('密钥太短，建议 8 位以上'); return; }
+    if(vo && v===vo){ toast('新密钥与原密钥相同，请修改'); return; }
     if(v!==v2){ toast('两次输入的新密钥不一致，请重新输入'); $('akNew').value=''; if($('akNew2')) $('akNew2').value=''; return; }
     KB.cfg.adminKeyHash=akHash(v); delete KB.cfg.adminKey;
     KBDirty=true; saveKB(true); adminRender(); toast('原密钥验证通过，管理员密钥已更新（仅存哈希）');
   });
+  function akLive(){
+    var vo=(($('akOld')||{}).value||''), v=(($('akNew')||{}).value||''), v2=(($('akNew2')||{}).value||'');
+    var so=$('akOldState'), s1=$('akNewState'), s2=$('akNew2State');
+    var okOld=!!KB.cfg.adminKeyHash && !!vo && akHash(vo)===KB.cfg.adminKeyHash;
+    if(so){ so.textContent = !vo ? '' : (okOld ? '✓ 验证正确' : '✗ 不正确');
+            so.style.color = okOld ? '#7fd8a6' : '#e08585'; }
+    if(s1){ s1.textContent = (v && vo && v===vo) ? '⚠ 密码一致，请修改！' : '';
+            s1.style.color = '#e0a85e'; }
+    if(s2){ s2.textContent = (!v2 || !v) ? '' : (v2===v ? '✓ 两次一致' : '✗ 两次不一致');
+            s2.style.color = (v2 && v2===v) ? '#7fd8a6' : '#e08585'; }
+  }
+  ['akOld','akNew','akNew2'].forEach(function(id){ var el=$(id); if(el) el.addEventListener('input',akLive); });
   var _sb=$('btnSeed');
   if(_sb) _sb.addEventListener('click',exportSeed);
 }
