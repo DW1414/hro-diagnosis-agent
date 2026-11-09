@@ -219,7 +219,7 @@ tr.tbd td{background:#fdf6e8}
 </head>
 <body>
 <!--APPBUILD:START-->
-<script id="appbuild">window.__APP_BUILD__={"ver":"2.3.3","build":"e8007b92db02d662","kbVer":"2.3.0","kbSchema":1};</script>
+<script id="appbuild">window.__APP_BUILD__={"ver":"2.3.3","build":"ff41a9d2c178dcd0","kbVer":"2.3.0","kbSchema":1};</script>
 <!--APPBUILD:END-->
 <!--GATE:START-->
 <!-- ===== 访问门禁（离线校验，密码不以明文出现在源码中） ===== -->
@@ -9500,6 +9500,10 @@ function tabMds(t){
      +'对应知识节点：'+esc(src)+'</div>'
      +'<input type="file" data-mdfile="'+i+'" accept=".md,.markdown,.txt" multiple style="display:none"/></div>';
   });
+  h+='<div class="actcard" style="margin-top:14px"><div class="t">发布到云端程序（半自动发版）</div>'
+   +'<div style="font-size:12px;color:#9aa7b4;margin-bottom:8px">后台改完知识库 → 点下面导出 → 把得到的 <b>01_seed.js</b> 交给管理员发版 → 程序热更提示，所有人下次打开即最新。</div>'
+   +'<button class="btn sm" id="btnSeed" type="button">导出种子（发版用）</button>'
+   +'<span style="font-size:11.5px;color:#8b96a3;margin-left:8px">导出内容 = 本机当前知识库全量（不含明文密钥）</span></div>';
   t.innerHTML=h;
   function afterImport(applied,errs,jobs,label){
     if(applied.length){
@@ -9522,6 +9526,8 @@ function tabMds(t){
     adminRender();
   }
   $('btnMdAll').addEventListener('click',exportMd);
+  var _sb=$('btnSeed');
+  if(_sb) _sb.addEventListener('click',exportSeed);
   $('btnMdUpNew').addEventListener('click',function(){ $('fileMdNew').click(); });
   $('fileMdNew').addEventListener('change',function(){
     var fl=[]; for(var i=0;i<this.files.length;i++) fl.push(this.files[i]); /* 先拷贝，清空 value 会让 FileList 失效 */
@@ -9779,21 +9785,25 @@ function tabMeta(t){
    +(KB.cfg.adminKeyHash?'<b style="color:#7fd8a6">已设置（仅存 SHA-256 哈希，页面源码与导出文档里都没有明文）</b>'
                        :'<b style="color:#f0b46a">未设置</b>')
    +'</div>'
-   +'<div class="field"><label>重设密钥（留空则不修改）</label><input id="akNew" type="password" placeholder="输入新密钥后点右侧按钮" style="max-width:320px" /></div>'
+   +'<div class="field"><label>① 原密钥（身份验证，必填）</label><input id="akOld" type="password" placeholder="输入当前正在使用的管理员密钥" style="max-width:320px" /></div>'
+   +'<div style="display:flex;gap:12px;flex-wrap:wrap;margin-top:6px;max-width:520px">'
+   +'<div class="field" style="flex:1;min-width:150px"><label>② 新密钥</label><input id="akNew" type="password" placeholder="输入新密钥" /></div>'
+   +'<div class="field" style="flex:1;min-width:150px"><label>③ 确认新密钥</label><input id="akNew2" type="password" placeholder="再输入一次，须完全一致" /></div></div>'
    +'<div style="margin-top:8px"><button class="btn teal sm" id="akSet" type="button">保存密钥</button>'
-   +'<span style="font-size:11.5px;color:#8b96a3;margin-left:8px">保存后只留哈希；请自行记牢，忘记只能通过 MD 导入重设</span></div></div>'
-   +'<div class="actcard"><div class="t">发布到云端程序（半自动发版）</div>'
-   +'<div style="font-size:12px;color:#9aa7b4;margin-bottom:8px">后台改完知识库 → 点下面导出 → 把得到的 <b>01_seed.js</b> 交给管理员发版 → 程序热更提示，所有人下次打开即最新。</div>'
-   +'<button class="btn sm" id="btnSeed" type="button">导出种子（发版用）</button>'
-   +'<span style="font-size:11.5px;color:#8b96a3;margin-left:8px">导出内容 = 本机当前知识库全量（不含明文密钥）</span></div>';
+   +'<span style="font-size:11.5px;color:#8b96a3;margin-left:8px">原密钥验证通过 + 两次新密钥一致方可保存；只留哈希，忘记只能通过 MD 导入重设</span></div></div>';
   bindFields(t);
   var _akb=$('akSet');
   if(_akb) _akb.addEventListener('click',function(){
-    var v=($('akNew').value||'').trim();
+    var vo=(($('akOld')||{}).value||'').trim(), v=($('akNew').value||'').trim(), v2=(($('akNew2')||{}).value||'').trim();
+    if(KB.cfg.adminKeyHash){
+      if(!vo){ toast('请先输入原密钥验证身份'); return; }
+      if(akHash(vo)!==KB.cfg.adminKeyHash){ toast('原密钥验证失败，未做修改'); return; }
+    }
     if(!v){ toast('未输入新密钥，未做修改'); return; }
     if(v.length<6){ toast('密钥太短，建议 8 位以上'); return; }
+    if(v!==v2){ toast('两次输入的新密钥不一致，请重新输入'); $('akNew').value=''; if($('akNew2')) $('akNew2').value=''; return; }
     KB.cfg.adminKeyHash=akHash(v); delete KB.cfg.adminKey;
-    KBDirty=true; saveKB(true); adminRender(); toast('管理员密钥已更新（仅存哈希）');
+    KBDirty=true; saveKB(true); adminRender(); toast('原密钥验证通过，管理员密钥已更新（仅存哈希）');
   });
   var _sb=$('btnSeed');
   if(_sb) _sb.addEventListener('click',exportSeed);

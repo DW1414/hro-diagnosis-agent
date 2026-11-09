@@ -125,8 +125,17 @@ function mk(before) {
   const NEWK = 'Qa7#kb-2026';
   D1.querySelector('#mbody [data-tab="meta"]').click();
   await wait(200);
-  ck('15 概览页有密钥重设与导出种子入口', !!D1.getElementById('akSet') && !!D1.getElementById('btnSeed'));
+  ck('15 概览页有密钥双重验证表单（原密钥+新密钥+确认）',
+     !!D1.getElementById('akSet') && !!D1.getElementById('akOld') && !!D1.getElementById('akNew') && !!D1.getElementById('akNew2'));
+  D1.querySelector('#mbody [data-tab="mds"]').click();
+  await wait(150);
+  const hasSeedBtn = !!D1.getElementById('btnSeed');
+  D1.querySelector('#mbody [data-tab="meta"]').click();
+  await wait(150);
+  ck('15b 导出种子入口已迁移至 MD 文件库页签最下方', hasSeedBtn);
+  D1.getElementById('akOld').value = AK;
   D1.getElementById('akNew').value = NEWK;
+  D1.getElementById('akNew2').value = NEWK;
   D1.getElementById('akSet').dispatchEvent(new w1.MouseEvent('click', { bubbles: true }));
   await wait(300);
   const kb2 = w1.__diag.getKB();
