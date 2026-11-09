@@ -1604,7 +1604,7 @@ function mdVols(){
 var VOLSRC={ /* 分节 → 知识库节点（后台「MD 文件库」展示来源用） */
  '00':'meta / cfg / tags（总控与整改标签）','01':'aspects（四维 27 子项）','02':'priority / extract（排序与信号词）',
  '03':'score（17 评分项）','04':'guide（写作要求）','05':'log（变更日志）','06':'cover / 八要素（判定标准B）',
- '07':'acts（72 措施卡）','08':'kp（34 知识包）','09':'rules（判定标准A）','11':'evals（独立评价项）'
+ '07':'acts（@ACTS@ 措施卡）','08':'kp（@KP@ 知识包）','09':'rules（判定标准A）','11':'evals（独立评价项）'
 };
 function mdFiles(){
   var BUILTIN=[
@@ -2401,7 +2401,10 @@ function tabMds(t){
   all.forEach(function(f,i){
     var off=st[f.name]&&st[f.name].on===false;
     var txt=off?'':(Vmap[f.name]||'');
-    var src=(f.vols||[]).map(function(v){ return v+'→'+(VOLSRC[v]||''); }).join('　｜　');
+    var src=(f.vols||[]).map(function(v){
+      var d=String(VOLSRC[v]||'').replace('@ACTS@',(KB.acts||[]).length).replace('@KP@',KB.kp?Object.keys(KB.kp).length:0);
+      return v+'→'+d;
+    }).join('　｜　');
     h+='<div class="actcard" style="padding:12px 14px;margin-bottom:10px">'
      +'<div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">'
      +'<b style="font-size:13px;color:#1b2430">'+esc(f.name)+'</b>'
