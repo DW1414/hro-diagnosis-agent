@@ -17,23 +17,32 @@
   var toast = function (m) { if (D && D.toast) D.toast(m); };
 
   var KEY = 'opsdiag.llm';
+  /* 2026-11-10 增：每家服务商配「普通对话 / 专业（深度推理）」两档模型预设，
+     选档位自动填模型名；仍可手填任意模型名（选「自定义」档）。 */
   var PROVIDERS = [
     { id: 'deepseek', name: 'DeepSeek 深度求索', url: 'https://api.deepseek.com/v1', model: 'deepseek-chat',
-      tip: 'platform.deepseek.com 申请密钥；deepseek-chat（V3）/ deepseek-reasoner（R1 推理）' },
+      models: [{ m: 'deepseek-chat', n: 'V3 · 普通对话' }, { m: 'deepseek-reasoner', n: 'R1 · 深度推理' }],
+      tip: 'platform.deepseek.com 申请密钥；V3 日常够用，复杂归纳可选 R1（更慢、更贵）' },
     { id: 'doubao', name: '豆包 · 火山方舟', url: 'https://ark.cn-beijing.volces.com/api/v3', model: 'ep-2024xxxxxxxx-xxxxx',
-      tip: '模型名须填「推理接入点 ID」（ep- 开头），在火山方舟控制台创建' },
+      models: [{ m: 'doubao-seed-1-6-250615', n: 'Seed 1.6 · 普通对话' }, { m: 'doubao-seed-1-6-thinking-250615', n: 'Seed 1.6 Thinking · 深度推理' }],
+      tip: '可填模型 ID（以方舟控制台显示为准），也可填「推理接入点 ID」（ep- 开头）' },
     { id: 'kimi', name: 'Kimi · 月之暗面', url: 'https://api.moonshot.cn/v1', model: 'moonshot-v1-32k',
-      tip: 'platform.moonshot.cn 申请；moonshot-v1-8k / 32k / 128k' },
+      models: [{ m: 'moonshot-v1-32k', n: 'v1-32k · 普通对话' }, { m: 'kimi-thinking-preview', n: 'K1.5 · 深度推理' }],
+      tip: 'platform.moonshot.cn 申请；超长口述选 moonshot-v1-128k，K2 系列：kimi-k2-0905-preview' },
     { id: 'qwen', name: '通义千问 · 阿里云百炼', url: 'https://dashscope.aliyuncs.com/compatible-mode/v1', model: 'qwen-plus',
-      tip: 'qwen-plus / qwen-max / qwen-turbo' },
+      models: [{ m: 'qwen-plus', n: 'Qwen-Plus · 普通对话' }, { m: 'qwq-plus', n: 'QwQ · 深度推理' }],
+      tip: '百炼控制台申请；普通 qwen-plus / qwen-max，深度推理 qwq-plus' },
     { id: 'glm', name: '智谱 GLM', url: 'https://open.bigmodel.cn/api/paas/v4', model: 'glm-4-flash',
-      tip: 'open.bigmodel.cn 申请；glm-4 / glm-4-flash' },
+      models: [{ m: 'glm-4-flash', n: 'GLM-4-Flash · 普通对话（免费）' }, { m: 'glm-z1-air', n: 'GLM-Z1-Air · 深度推理' }],
+      tip: 'open.bigmodel.cn 申请；glm-4-flash 免费，深度推理选 Z1 系列' },
     { id: 'hunyuan', name: '腾讯混元', url: 'https://api.hunyuan.cloud.tencent.com/v1', model: 'hunyuan-turbo',
-      tip: '腾讯云控制台申请' },
+      models: [{ m: 'hunyuan-turbo', n: 'Turbo · 普通对话' }, { m: 'hunyuan-t1-latest', n: 'T1 · 深度推理' }],
+      tip: '腾讯云控制台申请；模型名以控制台模型列表页显示为准' },
     { id: 'ollama', name: '本机 Ollama（数据不出网）', url: 'http://localhost:11434/v1', model: 'qwen2.5:7b',
-      tip: '需先设置环境变量 OLLAMA_ORIGINS=* 并重启 Ollama，否则浏览器跨域被拦' },
+      models: [{ m: 'qwen2.5:7b', n: 'Qwen2.5 7B · 普通对话' }, { m: 'deepseek-r1:14b', n: 'DeepSeek-R1 14B · 深度推理' }],
+      tip: '先 ollama pull 对应模型；需设置环境变量 OLLAMA_ORIGINS=* 并重启 Ollama，否则浏览器跨域被拦' },
     { id: 'custom', name: '自定义 / 自建网关', url: '', model: '',
-      tip: 'One-API、New-API、Nginx 反代等 OpenAI 兼容网关，填到 /v1 为止' }
+      tip: 'One-API、New-API、Nginx 反代等 OpenAI 兼容网关，填到 /v1 为止；模型名手填' }
   ];
   var DEF = { on: false, pid: 'deepseek', base: 'https://api.deepseek.com/v1', key: '', model: 'deepseek-chat',
               temp: 0.3, timeout: 60, mask: true };
@@ -174,6 +183,27 @@
       + 'background:#4ee3a0;border:2px solid #0b1622}'
       + '#aiFab.running{animation:aipulse 1.2s infinite}'
       + '@keyframes aipulse{0%,100%{box-shadow:0 0 0 0 rgba(232,197,132,.55)}50%{box-shadow:0 0 0 12px rgba(232,197,132,0)}}'
+      + /* 2026-11-10 增：AI 调用中的大动画（右下角约 1/4 页面，主人的要求——醒目） */
+      '#aiGlow{position:fixed;right:0;bottom:0;width:min(56vmin,580px);height:min(56vmin,580px);'
+      + 'z-index:99996;pointer-events:none;display:none}'
+      + '#aiGlow.on{display:block}'
+      + '#aiGlow .g1{position:absolute;inset:0;'
+      + 'background:radial-gradient(circle at 94% 94%, rgba(232,197,132,.30) 0%, rgba(232,197,132,.13) 34%, rgba(232,197,132,0) 64%);'
+      + 'animation:aiGlowB 1.5s ease-in-out infinite}'
+      + '#aiGlow .g2,#aiGlow .g3{position:absolute;right:38px;bottom:calc(86px + env(safe-area-inset-bottom,0px));'
+      + 'width:24px;height:24px;border-radius:50%;border:2px solid rgba(232,197,132,.75);'
+      + 'transform:translate(50%,50%) scale(1);animation:aiRing 2s ease-out infinite}'
+      + '#aiGlow .g3{animation-delay:1s}'
+      + '#aiGlow .gtxt{position:absolute;right:74px;bottom:calc(98px + env(safe-area-inset-bottom,0px));'
+      + 'font-size:13px;color:#f6e2b8;background:rgba(12,22,34,.9);border:1px solid rgba(232,197,132,.4);'
+      + 'border-radius:99px;padding:6px 14px;box-shadow:0 4px 18px rgba(0,0,0,.45);white-space:nowrap}'
+      + '#aiGlow .gtxt b{font-weight:600;animation:aiGlowB 1.5s ease-in-out infinite}'
+      + '#aiGlow .gtxt span{display:inline-block;animation:aiDot 1.2s infinite}'
+      + '#aiGlow .gtxt .d2{animation-delay:.2s}#aiGlow .gtxt .d3{animation-delay:.4s}'
+      + '@keyframes aiGlowB{0%,100%{opacity:.55}50%{opacity:1}}'
+      + '@keyframes aiRing{0%{transform:translate(50%,50%) scale(1);opacity:.75}'
+      + '100%{transform:translate(50%,50%) scale(26);opacity:0}}'
+      + '@keyframes aiDot{0%,100%{opacity:.15}50%{opacity:1}}'
       + '#aiDrawer{position:fixed;inset:0;z-index:9999;display:none}'
       + '#aiDrawer.on{display:block}'
       + '#aidMask{position:absolute;inset:0;background:rgba(3,8,14,.62);backdrop-filter:blur(2px)}'
@@ -222,12 +252,18 @@
       + '.aiSumBox{border:1px solid #b9d3ea;background:#f3f8fd;border-radius:10px;padding:10px 13px;margin-top:12px;'
       + 'font-size:12px;color:#1b2430;line-height:1.85}'
       + '.aiSumBox h6{margin:0 0 6px;font-size:12.5px;color:#1f5c99}'
-      + '@media print{#aiDrawer,#aiFab{display:none!important}}';
+      + '@media print{#aiDrawer,#aiFab,#aiGlow{display:none!important}}';
     document.head.appendChild(st);
     var fab = document.createElement('div');
     fab.id = 'aiFab'; fab.title = 'AI 增强（点击配置）'; fab.textContent = '✨';
     fab.addEventListener('click', openConfig);
     document.body.appendChild(fab);
+    /* 2026-11-10 增：AI 调用中的大动画层（右下角 1/4 页面） */
+    var glow = document.createElement('div');
+    glow.id = 'aiGlow';
+    glow.innerHTML = '<div class="g1"></div><div class="g2"></div><div class="g3"></div>'
+      + '<div class="gtxt"><b>✨ AI 分析中</b><span class="d1">·</span><span class="d2">·</span><span class="d3">·</span></div>';
+    document.body.appendChild(glow);
     var d = document.createElement('div');
     d.id = 'aiDrawer';
     d.innerHTML = '<div id="aidMask"></div><div id="aidPanel">'
@@ -245,7 +281,10 @@
     f.classList.toggle('on', !!c.on);
     f.title = c.on ? 'AI 增强：已开启（生成报告自动融入 AI 建议）' : 'AI 增强：未开启（点击配置）';
   }
-  function fabRun(v) { var f = $('aiFab'); if (f) f.classList.toggle('running', !!v); }
+  function fabRun(v) {
+    var f = $('aiFab'); if (f) f.classList.toggle('running', !!v);
+    var g = $('aiGlow'); if (g) g.classList.toggle('on', !!v);   /* 大动画同步亮起 */
+  }
   function drawer(title) {
     ensureUI();
     $('aidTitle').textContent = title;
@@ -290,6 +329,7 @@
       + '<div style="font-weight:400;font-size:11px;color:#9fb0c2;margin-top:2px">开启后：生成报告时自动结合知识库与大模型，把贴合项目的建议、改写与归纳直接写入诊断报告</div></b>'
       + '<input type="checkbox" id="aiOn" ' + (c.on ? 'checked' : '') + ' /></div>'
       + '<div class="aidField"><label>服务商预设</label><select id="aiPid">' + opts + '</select></div>'
+      + '<div class="aidField" id="aiTierField"><label>模型档位（普通 / 专业）</label><select id="aiTier"></select></div>'
       + '<div class="aidRow2">'
       + '<div class="aidField"><label>模型名</label><input id="aiModel" value="' + esc(c.model) + '" placeholder="如 deepseek-chat" /></div>'
       + '<div class="aidField"><label>温度（0-1，越低越稳）</label><input id="aiTemp" value="' + esc(c.temp) + '" /></div>'
@@ -316,13 +356,35 @@
       + '<b style="color:#e8c584">隐私：</b>开启自动脱敏后，项目名 / 客户名 / 人名 / 电话 等发送前替换为占位符；'
       + 'API Key 仅存本机浏览器，不随页面分享。</div>';
 
+    /* 档位下拉：随服务商重建；当前模型名能对上预设就选中，对不上落「自定义」 */
+    function paintTier(p, selVal) {
+      var t = $('aiTier'), fd = $('aiTierField');
+      if (!t || !fd) return;
+      var arr = (p && p.models) || [];
+      fd.style.display = arr.length ? '' : 'none';
+      t.innerHTML = arr.map(function (m) {
+        return '<option value="' + esc(m.m) + '">' + esc(m.n) + '（' + esc(m.m) + '）</option>';
+      }).join('') + '<option value="__custom__">自定义（手填模型名）</option>';
+      t.value = selVal || '__custom__';
+      if (t.selectedIndex < 0) t.value = '__custom__';
+    }
+    function prov(id) { var r = null; PROVIDERS.forEach(function (x) { if (x.id === id) r = x; }); return r; }
+    paintTier(cur, (function () {
+      var hit = '__custom__';
+      ((cur && cur.models) || []).forEach(function (m) { if (m.m === c.model) hit = m.m; });
+      return hit;
+    })());
     $('aiPid').addEventListener('change', function () {
-      var id = this.value, p = null;
-      PROVIDERS.forEach(function (x) { if (x.id === id) p = x; });
+      var p = prov(this.value);
       if (!p) return;
       if (p.url) $('aiBase').value = p.url;
-      if (p.model) $('aiModel').value = p.model;
+      var m0 = (p.models && p.models.length) ? p.models[0].m : (p.model || '');
+      $('aiModel').value = m0;
+      paintTier(p, m0 || '__custom__');
       $('aiState').textContent = p.tip || '';
+    });
+    $('aiTier').addEventListener('change', function () {
+      if (this.value !== '__custom__') $('aiModel').value = this.value;
     });
     $('aiSave').addEventListener('click', function () {
       var c2 = cfg();
