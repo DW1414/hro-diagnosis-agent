@@ -193,11 +193,16 @@ function hasAny(s,arr){ return inArr(s,arr); }
 /* 已闭环/已消除表述不作为负面判定（沿用 v1 RF_DONE 思路，避免误伤） */
 var NEG_DONE=/未发生|零事故|零投诉|0事故|无事故|无投诉|已消除|已闭环|已整改|归零|降至\s*0|降到\s*0|已解决|历史曾/;
 function isNeg(s){ if(NEG_DONE.test(s)) return null; return inArr(s,KB.extract.pain.neg); }
-/* 解决「指标串台」：取紧贴指标名之后的第一个数 */
+/* 解决「指标串台」：取紧贴指标名之后的第一个数
+   2026-11-10 修两处：
+   ① 相对位置/绝对位置混比 → 统一换算成绝对位置再比较；
+   ② 宽泛 pattern 抢台 → pattern 按「具体→宽泛」排列，前一个取到值就不再让后面的宽泛词覆盖
+      （否则「满意度」会在「员工满意度 87」被更靠前的「客户满意度 92」顶掉）。 */
 function bindMetric(text,pats){
-  var T=String(text||''),best=null;
+  var T=String(text||''),found=null;
   (pats||[]).forEach(function(p){
-    var i=T.indexOf(p);
+    if(found) return;
+    var best=null, i=T.indexOf(p);
     while(i>=0){
       var seg=T.slice(i,Math.min(T.length,i+p.length+30));
       var nums=listNums(seg);
@@ -212,11 +217,12 @@ function bindMetric(text,pats){
           if(n.pos>=p.length && n.pos-p.length<26 && (n.unit==='%'||n.unit==='分'||n.unit==='')){ pick=n; break; }
         }
       }
-      if(pick && (!best || pick.pos<best.pos)) best={v:pick.v,unit:pick.unit,pos:pick.pos+i};
+      if(pick && (!best || (pick.pos+i)<best.pos)) best={v:pick.v,unit:pick.unit,pos:pick.pos+i};
       i=T.indexOf(p,i+1);
     }
+    if(best) found=best;
   });
-  return best?best.v:null;
+  return found?found.v:null;
 }
 /* 共用指標抗串台：同名指标（如三条「推进计划达成率」）必须同时命中本方面上下文词才取值 */
 function bindCtx(T,row){
@@ -265,7 +271,10 @@ function evalRow(row,x){
     var L=row.ladder;
     if(x>=L.cap) return L.capScore;
     if(L.zero!=null && x===0) return L.zero;
-    var s=Math.floor(x/L.step)*L.per;
+    /* 2026-11-10 修：带起步线的阶梯（如推进计划达成率 base=55%，55% 起每 5% 得 1 分）
+       原来直接用 floor(x/step) 没减 base，导致 55%~79% 一律顶到满分。 */
+    var base=(L.base==null?0:Number(L.base)||0);
+    var s = base>0 ? (Math.floor((x-base)/L.step)*L.per+L.per) : (Math.floor(x/L.step)*L.per);
     return Math.max(L.zero||0,Math.min(L.capScore,s));
   }
   if(t==='ladder_down'){
@@ -2024,6 +2033,13 @@ function aspectNameOf(code){
   return a?(a.name||a.slogan||''):'';
 }
 function mergeSupplements(){
+  /* 2026-11-10 修①：点按钮前先收一遍输入框实时值。
+     原来只读内存里的 COVERX，输入后没触发 change（直接点按钮）时内容会丢。 */
+  Array.prototype.forEach.call(document.querySelectorAll('#coverBox [data-cvx]'),function(el){
+    var k=el.getAttribute('data-cvx'), v=String(el.value||'').trim();
+    if(v) COVERX[k]=v; else if(COVERX[k]!=null) delete COVERX[k];
+  });
+  saveCoverX();
   var add=[],done=[];
   Object.keys(COVERX).forEach(function(k){
     var v=String(COVERX[k]||'').trim(); if(!v) return;
@@ -2038,7 +2054,14 @@ function mergeSupplements(){
         }
       }
     }
-    add.push('【'+supLabel(k)+'】'+v); done.push(k);
+    /* 2026-11-10 修②：按句拆开、逐句带子项标签再并入。
+       分析是「句子含该子项关键词才计入」，整段并成一行时，答在后面的「100% 应用」
+       这类句子不含「电子签」就落不到该子项上，卡片会一直弹。 */
+    var label='【'+supLabel(k)+'】';
+    var parts=String(v).split(/[。；;\n]+/).map(function(x){return x.trim();}).filter(function(x){return x;});
+    if(!parts.length) parts=[String(v).trim()];
+    parts.forEach(function(p){ add.push(label+p); });
+    done.push(k);
   });
   if(!add.length){ toast('请先在待补充项下方输入补充信息'); return; }
   var ta=$('tx2');
@@ -2954,27 +2977,42 @@ function count(){
   if($('cc2')) $('cc2').textContent=(b.value||'').length+' 字';
 }
 var DEMO={
- name:'某新能源材料项目', type:'A类', head:'约 260 人', conf:'18 人（项目经理 1+行政 2+主管 3+EHS 3+班组长 9）',
+ name:'某汽车零部件冲焊项目（演示）', type:'A类', head:'约 320 人', conf:'21 人（项目经理 1+行政 2+主管 3+EHS 3+班组长 10+技术员 2）',
  oral:[
-  '今天走访了该项目现场，人数约 260 人，管理配置 18 人。',
-  '现场管理方面：安全三级教育覆盖率 100%，特种作业持证上岗率 100%，全年未发生安全事故；隐患排查台账每周更新，闭环率 96%。',
-  '品质方面：SOP 覆盖率 85%，关键工序的作业指导书还有 3 份没补齐；作业遵守度从年初的 70% 提升到 92%。',
-  '本月发生客户投诉 2 起，其中 1 起走到索赔，主要是外观判定的标准没有统一。',
-  '成本方面：线体平衡率 72%，离目标 85% 还有差距；我们通过一人双线减少了 4 人，月节约约 6 万元。',
-  '目视化这块，看板更新不及时，仓库的手工目视化库位做得不错，客户也有借鉴。',
-  '人员服务方面：系统离职率 3.9%，但实际统计下来有 7% 左右，偏差主要是已离职没走系统流程。',
-  '员工关怀做了宿舍家访和生日会，但缺少员工风采展示墙，内容没能外化展示。',
-  '员工满意度问卷还没有建立执行，目前只有随机访谈，满意度大概 85 分，没有量化数据支撑。',
-  '招聘方面：系统内荐自招率 51%，主要靠 BOSS 直聘和朋友圈自招；招聘费用占比 13.6%。',
-  '旺季缺口最大时有 60 人，供应商交付跟不上，供应商评价体系还没标准化。',
-  'IT 应用方面：钉钉考勤覆盖率 100%，但跨天打卡还有问题；电子签覆盖率只做到 60%，一线员工推广有阻力。',
-  '系统里的在职人数和现场实际对不上，导致系统数据失准。'
+  '今天走访了某汽车零部件冲焊项目现场，在册 320 人，管理配置 21 人，项目处于稳定运营期。',
+  '安全方面：三级教育覆盖率 100%，特种作业持证上岗率 100%，全年零伤害、零违章；隐患排查台账每周更新，闭环率 97%。',
+  '品质方面：SOP 覆盖率 88%，关键工序还有 3 份作业指导书未补齐；作业遵守度从年初 78% 提升到 91%。',
+  '本月客户投诉 2 起，其中 1 起按客户判定标准整批返工，根因是外观判定标准在两个班组之间不统一。',
+  '成本方面：线体平衡率 81%，距目标 85% 还差 4 个点；推行一人多机后减员 5 人，月节约 7.2 万元，改善收益已量化入账。',
+  '交付模式方面：本项目为线边仓直供，节奏跟随客户产线，无独立交付考核项。',
+  '目视化方面：仓库目视化库位做法被客户借鉴，已推广到客户另外两条产线。',
+  '产线看板更新不及时，已连续 2 周未刷新记录。',
+  '精益方面：本季度改善提案 38 件，人均 0.4 件，闭环 31 件；改善案例尚未成册，沉淀不足。',
+  '人员服务方面：系统离职率 9.8%，控制在 10% 的目标线以内；在职人数与现场盘点一致，系统数据已量化核对并按周复盘。',
+  '人文关怀方面：员工档案覆盖率 100%，季度家访 42 次，生日会 12 场，宿舍走访全覆盖。',
+  '教育训练方面：新员工培训覆盖率 100%，多能工覆盖率 68%，认证通过率 92%。',
+  '薪酬福利方面：薪酬规则全部公示并留痕，全年无薪酬争议。',
+  '团队建设方面：团建活动 6 场，参与率 83%，签到与活动照片留痕归档。',
+  '职业晋升方面：晋升通道制度完善，年内内部晋升 9 人，骨干留存率 91%。',
+  '客户满意度评分 92，年内获客户表彰信 2 封。',
+  '季度考核KPI达成率 96%，该项考核从 Q4 起正式纳入。',
+  '员工管理方面：岗位说明书覆盖率 96%，考核公示率 100%；员工满意度 87 分，问卷覆盖率 76%。',
+  '招聘方面：系统内荐自招率 55%，招聘费用占比 5.8%，平均到岗 6.5 天，三项指标已量化并按月复盘。',
+  '用工弹性方面：淡旺季波动明显，旺季高峰单日需求上浮 45 人，调配靠共享用工与跨项目借调，调配台账完整。',
+  '供应商评价按季度评级打分，汰换机制尚在建立中。',
+  'IT 应用方面：钉钉考勤覆盖率 98%，考勤日报自动推送班组；两个新班组计划月底接入；电子签覆盖率 62%，一线员工推广阻力较大，已列入本月专项推进并每周跟踪。',
+  '系统报表与数据日报每日自动推送管理层，异常响应有专人跟踪。',
+  '应急预案每季度演练一次，重点风险已做前置预判并留痕。',
+  '现场管理类推进计划达成率 81%，年度 16 项计划完成 13 项。',
+  '员工服务类推进计划达成率 82%，逾期 1 项已闭环。',
+  '招聘能力类推进计划本季度未纳入统计，数据待补。',
+  '财务口径的累计利润达成率数据待财务核对后另行补充。'
  ].join('\n'),
  supp:[
-  '客户要求：客户明确要求下个月把外观判定标准统一，并且限我们在月底前把客诉闭环率做到 100%。',
-  '客户希望：客户希望我们能够把精益改善成果形成案例，在集团内部推广。',
-  '项目痛点：office 区域是英格玛专属但没有英格玛元素；电子签推广阻力大；员工离职率高居不下。',
-  '项目亮点：手工目视化库位被客户借鉴并在其他产线推广；今年获得客户表彰信 2 封。'
+  '客户要求：月底前完成外观判定标准统一并完成全员宣贯；下季度客诉闭环率保持 100%。',
+  '客户希望：把仓库目视化库位做法整理成标准案例，在集团内其他基地推广。',
+  '项目痛点：旺季用工弹性不足，主要靠临时借调兜底；电子签在一线推广阻力大；改善案例未成册。',
+  '项目亮点：仓库目视化库位被客户借鉴并横向推广；年内获客户表彰信 2 封；一人多机减员 5 人、月节约 7.2 万元。'
  ].join('\n')
 };
 function fillDemo(){
