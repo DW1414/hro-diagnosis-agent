@@ -154,6 +154,7 @@ python _build/release.py rollback REL-011 --target all         # 全回滚
 | 私有仓库没有 Pages 入口 | 免费账号限制 | 改 Public，或升级 GitHub Pro |
 | 国内访问 github.io 慢/不通 | 网络环境 | 换自有域名 + CDN，或镜像到 Gitee/Cloudflare Pages（`docs/` 目录可直接搬） |
 | 门禁密码忘了 | 哈希校验在页面内 | 重新构建并改 `04_gate.html` 里的 `GATE_OK` 哈希 |
+| `github.com` 连不上但 `api.github.com` 正常（`CONNECT tunnel failed, response 502` / `curl` 返回 000） | 出口代理拦了 web 域名，git push 走的就是 `github.com` | 用 Git Data API 推送：本地 `git commit` 后，按 `blob → tree → commit → 移动 ref → 建 tag` 五步调 `api.github.com`（脚本思路见第十节），并核对新 tree sha 是否等于本地 `git rev-parse HEAD^{tree}`；tree 一致即内容一字节不差。事后网络恢复记得 `git fetch && git reset --hard origin/main` 把本地历史对齐远端 |
 
 ---
 
@@ -165,3 +166,21 @@ python _build/release.py rollback REL-011 --target all         # 全回滚
 - **管理员入口密钥只存 SHA-256 哈希**（`cfg.adminKeyHash`）：页面源码、导出 MD、导出种子三处都没有明文。升级到 2.3.2 后，本机若存过旧的明文密钥会**自动作废并删除**，统一回落到种子里的默认密钥（默认值由管理员另行告知，不写进任何文档）；进后台「概览与总控」可重设。
 - 后台入口按钮对**所有通过门禁的人可见**，密钥是全局共享的一把。它是"软门槛"，不是账号体系；真要多角色/可审计，得上方案丙（Cloud service 登录）。
 - 2026-11-06 已做一次**仓库历史重写**：清除了历史提交里的知识库正文与明文口令，并强推覆盖远端。此后若再误提交敏感文件，仅"删文件再提交"不够——历史里仍在，必须重写（或直接换仓库）。
+
+---
+
+## 十、备用通道：github.com 不通时用 API 推送（2026-11-10 实操）
+
+出口代理有时只拦 `github.com` / `raw.githubusercontent.com`，而 `api.github.com`、`*.github.io` 正常。此时 `git push` 必失败（`CONNECT tunnel failed, response 502`），但内容仍可经 Git Data API 送达。
+
+**五步流程**（`curl` 或 Python 皆可，`Authorization: token <PAT>`）：
+
+1. `GET /repos/{o}/{r}/git/ref/heads/main` → 取远端 head sha；再 `GET /git/commits/{sha}` → 取 `base_tree`
+2. 对每个改动文件 `POST /git/blobs`，内容是 `git cat-file blob <本地commit>:<path>` 的 base64（**从对象库取，别读工作区**，避免换行符差异）
+3. `POST /git/trees`（带 `base_tree` + 改动条目）→ 新 tree sha
+4. `POST /git/commits`（message / tree / parents=[head]）→ 新 commit sha
+5. `PATCH /git/refs/heads/main` 移指针；`POST /git/refs` 建标签
+
+**关键校验**：第 3 步得到的新 tree sha 必须等于本地 `git rev-parse <commit>^{tree}`。相等即证明远端内容与本地提交一字节不差，可放心。
+
+**代价**：API 建的 commit 的 sha 与本地不同（committer/时间不同），本地与远端历史会分叉。网络恢复后执行 `git fetch origin && git reset --hard origin/main` 对齐即可——两边 tree 相同，工作区文件不会有任何变化。
