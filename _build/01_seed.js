@@ -2755,12 +2755,12 @@ window.__KB_SEED__ = {
    {
     "id": "tipHold",
     "slot": "holdTip",
-    "text": "按住说话，松开结束。"
+    "text": "点击说话，再点一次结束。"
    },
    {
     "id": "phTx",
     "slot": "tx",
-    "text": "按下下方金色按钮说话。"
+    "text": "点击下方金色按钮开始说话，再点一次结束。"
    },
    {
     "id": "phTx2",

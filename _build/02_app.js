@@ -2219,10 +2219,10 @@ function runCoverOnly(){
 
 /* ---------------- 页面备注文字（主人 2026-10-26 定：备注全部后台可增改） ----------------
    KB.hints.items = [{id, slot, text}]。区块类 slot 渲染为该区块顶部的 .hint 段落；
-   特殊槽位：tx/tx2 占位语、holdTip 按住说话提示、coverTag 标题小字、bKpi 折叠标题。 */
+   特殊槽位：tx/tx2 占位语、holdTip 说话提示、coverTag 标题小字、bKpi 折叠标题。 */
 var HINT_SLOTS={
   bRun:'生成按钮区',bOral:'走访口述区',bSupp:'补充信息区',bCover:'覆盖度检查区',
-  tx:'口述框占位语',tx2:'补充框占位语',holdTip:'按住说话提示',coverTag:'覆盖度标题小字',bKpi:'指标速填标题'
+  tx:'口述框占位语',tx2:'补充框占位语',holdTip:'说话提示',coverTag:'覆盖度标题小字',bKpi:'指标速填标题'
 };
 function applyHints(){
   var items=(KB.hints&&KB.hints.items)||[];
@@ -2251,8 +2251,12 @@ function applyHints(){
       if(c&&txt.trim()){ var d=document.createElement('div'); d.className='hint'; d.textContent=txt; c.appendChild(d); }
       return;
     }
-    if(it.slot==='tx'||it.slot==='tx2'){ var e=$(it.slot); if(e) e.placeholder=txt; return; }
-    if(it.slot==='holdTip'){ HOLDTIP=txt||'按住说话，松开结束。'; var h=$('holdTip'); if(h&&!recOn) h.textContent=HOLDTIP; return; }
+    if(it.slot==='tx'||it.slot==='tx2'){
+      /* 2026-11-11 迁移：旧默认占位语（按住说话时代）换成点击说话版；管理员自定义过的文字不动 */
+      if(txt==='按下下方金色按钮说话。'){ txt='点击下方金色按钮开始说话，再点一次结束。'; }
+      var e=$(it.slot); if(e) e.placeholder=txt; return;
+    }
+    if(it.slot==='holdTip'){ if(txt==='按住说话，松开结束。'){ txt='点击说话，再点一次结束。'; } HOLDTIP=txt||'点击说话，再点一次结束。'; var h=$('holdTip'); if(h&&!recOn) h.textContent=HOLDTIP; return; }
     if(it.slot==='coverTag'){ var s=$('coverTag'); if(s) s.textContent=txt; return; }
     if(it.slot==='bKpi'){ var f=$('kpiFold'); if(f){ var sm=f.querySelector('summary'); if(sm) sm.textContent=txt; } return; }
   });
@@ -2533,7 +2537,7 @@ function tabMds(t){
 function tabHints(t){
   var items=(KB.hints&&KB.hints.items)||[];
   var DEF={hintCover:'生成诊断后自动逐条核对子项覆盖情况；也可点下方「仅检查覆盖度」先单独跑一遍。',
-           tipHold:'按住说话，松开结束。',
+           tipHold:'点击说话，再点一次结束。',
            phTx:'按下下方金色按钮说话。',
            phTx2:'录入项目经理补充的客户要求、项目痛点、项目亮点等。将用于提取「客户需求 / 项目痛点 / 项目亮点」。',
            noteCover:'按知识库子项逐条核对'};
@@ -2922,9 +2926,94 @@ function exportHtmlWithKb(){
 }
 
 /* ---------------- 语音 ---------------- */
-var SR=null,rec=null,recOn=false,HOLDTIP='按住说话，松开结束。';
+var SR=null,rec=null,recOn=false,HOLDTIP='点击说话，再点一次结束。';
+/* 2026-11-11 增：错误码人话化（主人反馈「无法开启语音识别」，实测根因是麦克风权限） */
+var MIC_ERR={
+  network:'云识别服务连不上（Chrome 走 Google、Edge 走微软，国内网络常见）。可在 ✨ 面板配置云端语音接口，或换 Safari / iPad 使用。',
+  'not-allowed':'麦克风权限被拒。',
+  'audio-capture':'找不到麦克风设备：检查麦克风是否插好、是否被其他程序占用。',
+  'service-not-allowed':'当前页面来源不允许使用麦克风（需 https 或本地文件打开）。',
+  'no-speech':'没听到声音：说话大一点声，或检查系统输入设备。',
+  'aborted':'识别被中断，请重试。'
+};
+function isIOS(){ return /iP(hone|ad|od)/.test(navigator.userAgent) || (navigator.platform==='MacIntel' && navigator.maxTouchPoints>1); }
+function micModalShow(title, html){
+  var m=$('micModal'); if(!m) return;
+  m.querySelector('#micT').textContent=title;
+  m.querySelector('#micB').innerHTML=html;
+  m.classList.add('on');
+}
+function micModalHide(){ var m=$('micModal'); if(m) m.classList.remove('on'); }
+/* 麦克风权限指引（被拒后浏览器不会再弹窗，必须教用户手动放开） */
+var MIC_GUIDE='请按下面步骤放开：<br/><br/>'
+  + '<b>① 浏览器</b>：点地址栏左侧的 🔒（或 🎤）图标 → 麦克风 → 允许<br/>'
+  + '<b>② Windows</b>：设置 → 隐私和安全性 → 麦克风 → 允许应用访问<br/>'
+  + '<b>③ 改好后</b>：点下方「我已放开，重试」';
+/* 权限预检：granted 直接放行；prompt 主动触发浏览器原生授权弹窗；denied / 设备错 弹指引 */
+function ensureMic(){
+  return new Promise(function(res){
+    if(!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia){ res(true); return; }
+    if(!window.isSecureContext){
+      micModalShow('无法使用麦克风','当前页面不是 https / 本地地址，浏览器禁止调用麦克风。<br/>请使用线上地址或本地打开。');
+      res(false); return;
+    }
+    function afterPerm(st){
+      navigator.mediaDevices.getUserMedia({audio:true}).then(function(s){
+        s.getTracks().forEach(function(t){ t.stop(); });
+        res(true);
+      }).catch(function(e){
+        var n=(e&&e.name)||'';
+        if(n==='NotAllowedError'||n==='PermissionDeniedError'){
+          micModalShow('麦克风权限未放开', MIC_GUIDE);
+        } else if(n==='NotFoundError'||n==='DevicesNotFoundError'){
+          micModalShow('找不到麦克风设备','没有检测到可用麦克风。请检查麦克风是否插好、是否在系统里被禁用。');
+        } else if(n==='NotReadableError'||n==='TrackStartError'){
+          micModalShow('麦克风被占用','麦克风正被其他程序占用（如会议 / 直播软件）。关闭占用后点「我已放开，重试」。');
+        } else {
+          micModalShow('麦克风打开失败','原因：'+((e&&e.name)||e.message||'未知')+'<br/>'+MIC_GUIDE);
+        }
+        res(false);
+      });
+    }
+    if(navigator.permissions && navigator.permissions.query){
+      navigator.permissions.query({name:'microphone'}).then(function(st){
+        if(st && st.state==='denied'){
+          micModalShow('麦克风权限已被拒绝','之前拒绝过，浏览器不会再弹授权窗，需要手动放开：<br/><br/>'+MIC_GUIDE);
+          res(false); return;
+        }
+        afterPerm(st);   /* granted 直接验证；prompt 主动触发原生弹窗 */
+      }).catch(function(){ afterPerm(null); });
+    } else afterPerm(null);
+  });
+}
 function initVoice(){
   SR=window.SpeechRecognition||window.webkitSpeechRecognition;
+  /* 权限指引卡片（一次性注入） */
+  if(!$('micModal') && document.body){
+    var st=document.createElement('style');
+    st.textContent=''
+      +'#micModal{position:fixed;inset:0;z-index:99990;display:none;align-items:center;justify-content:center;'
+      +'background:rgba(3,8,14,.6);backdrop-filter:blur(2px);padding:20px}'
+      + '#micModal.on{display:flex}'
+      + '.mmCard{width:min(430px,92vw);background:#0b1622;border:1px solid rgba(232,197,132,.32);border-radius:18px;'
+      + 'padding:20px 22px;color:#dbe5f2;font-size:13px;line-height:1.85;box-shadow:0 20px 60px rgba(0,0,0,.5)}'
+      + '.mmCard h5{margin:0 0 10px;font-size:14.5px;color:#f6e2b8}'
+      + '.mmBtn{border:1px solid rgba(232,197,132,.45);background:rgba(232,197,132,.14);color:#f6e2b8;'
+      + 'border-radius:10px;padding:8px 16px;font-size:12.5px;cursor:pointer}'
+      + '.mmBtn:hover{background:rgba(232,197,132,.24)}'
+      + '.mmBtn.gh{border-color:rgba(255,255,255,.18);background:rgba(255,255,255,.05);color:#c8d6e8}'
+      + '@media print{#micModal{display:none!important}}';
+    document.head.appendChild(st);
+    var mm=document.createElement('div');
+    mm.id='micModal';
+    mm.innerHTML='<div class="mmCard"><h5 id="micT"></h5><div id="micB"></div>'
+      +'<div style="display:flex;gap:9px;margin-top:16px;justify-content:flex-end">'
+      +'<button class="mmBtn" id="micRetry" type="button">我已放开，重试</button>'
+      +'<button class="mmBtn gh" id="micClose" type="button">知道了</button></div></div>';
+    document.body.appendChild(mm);
+    mm.querySelector('#micClose').addEventListener('click', micModalHide);
+    mm.querySelector('#micRetry').addEventListener('click', function(){ micModalHide(); startRec(); });
+  }
   if(!SR){
     ['holdBtn','holdBtnM','holdTip'].forEach(function(id){ var e=$(id); if(e){ e.disabled=true; e.style.opacity=.45; } });
     if($('holdTip')) $('holdTip').textContent='当前浏览器不支持语音识别，请直接输入文本（推荐 Chrome / Edge）。';
@@ -2942,14 +3031,27 @@ function initVoice(){
       if(fin){ ta.value=(ta.value?ta.value.replace(/\s*$/,'')+'\n':'')+fin; ta.scrollTop=ta.scrollHeight; count(); }
       $('liveText').textContent=itm||'正在聆听…';
     };
-    rec.onerror=function(e){ toast('语音识别出错：'+e.error); stopRec(); };
+    rec.onerror=function(e){
+      var msg=MIC_ERR[e.error]||e.error;
+      if(e.error==='not-allowed') micModalShow('麦克风权限未放开', MIC_GUIDE);
+      toast('语音识别出错：'+msg);
+      stopRec();
+    };
     rec.onend=function(){ if(recOn){ try{rec.start();}catch(x){} } else { $('live').style.display='none'; } };
   }
   function startRec(){
-    if(!rec) build(); recOn=true; try{ rec.start(); }catch(e){}
-    $('live').style.display='flex'; $('liveText').textContent='正在聆听…';
-    ['holdBtn','holdBtnM'].forEach(function(id){var e=$(id); if(e) e.classList.add('on');});
-    if($('holdTip')) $('holdTip').textContent='正在聆听…松开结束。';
+    if(recOn) return;
+    /* ① 先跑权限预检（granted 秒过 / prompt 触发原生弹窗 / denied 弹指引），
+          通过后再启动识别（iOS 例外：SR 必须在手势内同步 start，Safari 自己管理权限弹窗） */
+    var go=function(){
+      if(!rec) build();
+      recOn=true; try{ rec.start(); }catch(e){}
+      $('live').style.display='flex'; $('liveText').textContent='正在聆听…';
+      ['holdBtn','holdBtnM'].forEach(function(id){var e=$(id); if(e) e.classList.add('on');});
+      if($('holdTip')) $('holdTip').textContent='正在聆听…再点一次结束。';
+    };
+    if(isIOS()){ go(); return; }
+    ensureMic().then(function(ok){ if(ok) go(); });
   }
   function stopRec(){
     recOn=false; try{ rec.stop(); }catch(e){}
@@ -2957,13 +3059,10 @@ function initVoice(){
     ['holdBtn','holdBtnM'].forEach(function(id){var e=$(id); if(e) e.classList.remove('on');});
     if($('holdTip')) $('holdTip').textContent=HOLDTIP;
   }
-  /* 真·按住说话：按下去开始，松手结束（2026-10-26 主人定） */
+  /* 点击说话：单击开始，再击结束，可持续转录（2026-11-11 主人定：一直按着太累，自 2026-10-26 的按住模式改来） */
   function bindHold(el){
     if(!el) return;
-    el.addEventListener('pointerdown',function(e){ e.preventDefault(); if(!recOn) startRec(); });
-    ['pointerup','pointerleave','pointercancel'].forEach(function(ev){
-      el.addEventListener(ev,function(){ if(recOn) stopRec(); });
-    });
+    el.addEventListener('pointerdown',function(e){ e.preventDefault(); if(recOn){ stopRec(); } else { startRec(); } });
     el.addEventListener('contextmenu',function(e){ e.preventDefault(); });
   }
   bindHold($('holdBtn')); bindHold($('holdBtnM'));

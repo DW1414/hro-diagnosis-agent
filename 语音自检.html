@@ -1,0 +1,108 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>语音识别自检</title>
+<style>
+  body{margin:0;font-family:"PingFang SC","Microsoft YaHei",system-ui,sans-serif;background:#f5f7fa;color:#1b2430;padding:28px 18px}
+  .wrap{max-width:640px;margin:0 auto}
+  h1{font-size:20px;margin:0 0 4px}
+  .sub{font-size:12.5px;color:#7a8798;margin-bottom:18px}
+  .card{background:#fff;border:1px solid #e3e8ef;border-radius:14px;padding:16px 18px;margin-bottom:12px;box-shadow:0 2px 10px rgba(15,30,50,.05)}
+  .row{display:flex;justify-content:space-between;align-items:center;padding:9px 0;border-bottom:1px dashed #eef1f5;font-size:13.5px}
+  .row:last-child{border-bottom:0}
+  .k{color:#5a6a7d}
+  .v{font-weight:600;text-align:right}
+  .ok{color:#0f9d58}.bad{color:#d93025}.warn{color:#e37400}
+  button{padding:11px 22px;border:0;border-radius:11px;background:#2f6fed;color:#fff;font-size:14px;cursor:pointer;font-weight:600}
+  button:hover{filter:brightness(1.06)}
+  button:disabled{background:#b9c3cf;cursor:not-allowed}
+  #log{font-size:12.5px;line-height:1.8;color:#3b4a5c;white-space:pre-wrap;margin-top:10px}
+  .live{margin-top:10px;font-size:13px;color:#2f6fed;min-height:18px}
+  .tip{font-size:12px;color:#8a95a5;line-height:1.7;margin-top:10px}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>🎙️ 语音识别自检</h1>
+  <div class="sub">在「你平时打开智能体的那个浏览器」里打开本页，一眼看出卡在哪一环。</div>
+
+  <div class="card" id="env">
+    <div class="row"><span class="k">浏览器</span><span class="v" id="ua">—</span></div>
+    <div class="row"><span class="k">页面地址协议</span><span class="v" id="proto">—</span></div>
+    <div class="row"><span class="k">安全上下文（https / localhost 必须）</span><span class="v" id="secure">—</span></div>
+    <div class="row"><span class="k">语音识别 API（SpeechRecognition）</span><span class="v" id="sr">—</span></div>
+    <div class="row"><span class="k">麦克风权限</span><span class="v" id="perm">—</span></div>
+  </div>
+
+  <div class="card">
+    <button id="go">开始识别测试（说话 3 秒）</button>
+    <div class="live" id="live"></div>
+    <div id="log"></div>
+    <div class="tip">
+      结果解读：<br/>
+      · <b>API 不支持</b> → 这个浏览器没有语音识别能力（常见于内置浏览器 / 部分国产浏览器壳），换 Chrome 或 Edge 打开即可；<br/>
+      · <b>network</b> → API 有、但云识别服务器连不上（Chrome 走 Google、Edge 走微软，国内网络常见），需代理或改用云端识别方案；<br/>
+      · <b>not-allowed / audio-capture</b> → 麦克风权限被拒：浏览器地址栏左侧图标里放开，并检查 Windows 设置 → 隐私 → 麦克风；<br/>
+      · <b>service-not-allowed</b> → 页面来源不受信任（需 https 或 localhost）。
+    </div>
+  </div>
+</div>
+
+<script>
+(function(){
+  function set(id, txt, cls){ var e=document.getElementById(id); e.textContent=txt; if(cls) e.className='v '+cls; }
+  var ua = navigator.userAgent, m = ua.match(/(Edg|Chrome|Firefox|Safari)\/[\d.]+/);
+  set('ua', (m ? m[0] : ua.slice(0, 40)) + (/Mobile/.test(ua) ? '（移动端）' : ''));
+  set('proto', location.protocol);
+  set('secure', window.isSecureContext ? '✓ 安全' : '✗ 不安全（语音会被拒）', window.isSecureContext ? 'ok' : 'bad');
+
+  var R = window.SpeechRecognition || window.webkitSpeechRecognition;
+  set('sr', R ? '✓ 支持' : '✗ 不支持 —— 换 Chrome / Edge', R ? 'ok' : 'bad');
+
+  if (navigator.permissions && navigator.permissions.query) {
+    navigator.permissions.query({ name: 'microphone' }).then(function(p){
+      var t = { granted: '✓ 已允许', denied: '✗ 已拒绝', prompt: '尚未询问' }[p.state] || p.state;
+      set('perm', t, p.state === 'granted' ? 'ok' : (p.state === 'denied' ? 'bad' : 'warn'));
+    }).catch(function(){ set('perm', '无法查询（不影响使用）', 'warn'); });
+  } else set('perm', '无法查询（不影响使用）', 'warn');
+
+  var btn = document.getElementById('go'), live = document.getElementById('live'), log = document.getElementById('log');
+  btn.addEventListener('click', function(){
+    log.textContent = ''; live.textContent = '';
+    if (!R) { log.innerHTML = '<b style="color:#d93025">结论：这个浏览器没有语音识别 API，智能体里按钮会是灰的。</b>请用 Chrome 或 Edge 打开智能体。'; return; }
+    btn.disabled = true;
+    var rec = new R(); rec.lang = 'zh-CN'; rec.continuous = true; rec.interimResults = true;
+    var t0 = Date.now();
+    rec.onstart = function(){ live.textContent = '正在聆听……说句话试试'; log.textContent += '[' + ((Date.now()-t0)/1000).toFixed(1) + 's] 识别已启动 ✓\n'; };
+    rec.onresult = function(e){
+      var s = '';
+      for (var i = e.resultIndex; i < e.results.length; i++) s += e.results[i][0].transcript;
+      live.textContent = '听到：' + s;
+      if (e.results[e.results.length-1].isFinal) log.textContent += '[' + ((Date.now()-t0)/1000).toFixed(1) + 's] 最终结果：' + s + '\n';
+    };
+    rec.onerror = function(e){
+      var map = {
+        network: '云识别服务器连不上（国内网络最常见）。Chrome 走 Google、Edge 走微软，需代理；或改用云端识别方案。',
+        'not-allowed': '麦克风权限被拒。点浏览器地址栏左侧的图标放开麦克风；Windows 设置 → 隐私 → 麦克风 也要开。',
+        'audio-capture': '找不到麦克风设备。检查麦克风是否插好、是否被其他程序占用。',
+        'service-not-allowed': '页面来源不受信任。语音识别要求 https 或 localhost 页面。',
+        'no-speech': '没听到声音。说话声音大一点，或检查系统输入设备。',
+        'aborted': '识别被中断（通常是权限或网络问题的连带表现）。'
+      };
+      var msg = map[e.error] || e.error;
+      log.innerHTML += '<b style="color:#d93025">[' + ((Date.now()-t0)/1000).toFixed(1) + 's] 出错：' + e.error + '</b> —— ' + msg + '\n';
+      live.textContent = '';
+      btn.disabled = false;
+      try { rec.stop(); } catch (x) {}
+    };
+    rec.onend = function(){ if (!log.textContent) log.textContent = '识别会话结束（无结果）。'; btn.disabled = false; };
+    setTimeout(function(){ try { rec.stop(); } catch (x) {} }, 12000);
+    try { rec.start(); log.textContent += '[0.0s] 已请求启动…\n'; }
+    catch (err) { log.innerHTML += '<b style="color:#d93025">启动即抛错：</b>' + err.message + '\n'; btn.disabled = false; }
+  });
+})();
+</script>
+</body>
+</html>
