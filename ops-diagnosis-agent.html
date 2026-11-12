@@ -219,7 +219,7 @@ tr.tbd td{background:#fdf6e8}
 </head>
 <body>
 <!--APPBUILD:START-->
-<script id="appbuild">window.__APP_BUILD__={"ver":"2.3.8","build":"b98e0395a9a2acfc","kbVer":"2.3.0","kbSchema":1};</script>
+<script id="appbuild">window.__APP_BUILD__={"ver":"2.3.9","build":"1a3c3491762a722f","kbVer":"2.3.0","kbSchema":1};</script>
 <!--APPBUILD:END-->
 <!--GATE:START-->
 <!-- ===== 访问门禁（离线校验，密码不以明文出现在源码中） ===== -->
@@ -10470,6 +10470,23 @@ window.__diag={run:run,getKB:function(){return KB;},getR:function(){return R;},m
       + '#aiFab.on::after{content:"";position:absolute;top:1px;right:1px;width:10px;height:10px;border-radius:50%;'
       + 'background:#4ee3a0;border:2px solid #0b1622}'
       + '#aiFab.running{animation:aipulse 1.2s infinite}'
+      + /* 2026-11-12 增：AI 问答悬浮球（✨ 球上方，问字金底，字样同步左上角 logo：20px 加粗金渐变） */
+      '#aiAskFab{position:fixed;right:16px;bottom:calc(116px + env(safe-area-inset-bottom,0px));z-index:99997;'
+      + 'width:44px;height:44px;border-radius:50%;display:flex;align-items:center;justify-content:center;'
+      + 'cursor:pointer;font-size:20px;font-weight:700;color:#1b2430;'
+      + 'background:linear-gradient(140deg,var(--gold2),var(--gold));border:0;'
+      + 'box-shadow:0 10px 26px rgba(232,197,132,.3);opacity:.92;transition:all .18s}'
+      + '#aiAskFab:hover{opacity:1;transform:scale(1.07)}'
+      + /* 2026-11-12 增：AI 未开启时的居中提示卡（不自动弹右侧抽屉，主人定） */
+      '#aiNeedCard{position:fixed;inset:0;z-index:99998;display:flex;align-items:center;justify-content:center;'
+      + 'background:rgba(3,8,14,.55)}'
+      + '.ancBox{background:#0b1622;border:1px solid rgba(232,197,132,.4);border-radius:16px;padding:24px 28px;'
+      + 'max-width:380px;color:#f4f7ff;font-size:13px;line-height:1.8;text-align:center;box-shadow:0 18px 50px rgba(0,0,0,.5)}'
+      + '.ancBox b{font-size:14.5px;color:#f6e2b8;display:block;margin-bottom:8px}'
+      + '.ancBox div{color:#c8d6e8;font-size:12px}'
+      + '.ancBtn{border:1px solid rgba(232,197,132,.5);background:linear-gradient(135deg,#e8c584,#f6e2b8);color:#0b1622;'
+      + 'border-radius:10px;padding:8px 18px;font-size:12.5px;cursor:pointer}'
+      + '.ancBtn.gh{background:rgba(255,255,255,.06);color:#c8d6e8;border-color:rgba(255,255,255,.16)}'
       + '@keyframes aipulse{0%,100%{box-shadow:0 0 0 0 rgba(232,197,132,.55)}50%{box-shadow:0 0 0 12px rgba(232,197,132,0)}}'
       + /* 2026-11-10 增：AI 调用中的大动画（右下角约 1/4 页面，主人的要求——醒目） */
       '#aiGlow{position:fixed;right:0;bottom:0;width:min(56vmin,580px);height:min(56vmin,580px);'
@@ -10540,12 +10557,17 @@ window.__diag={run:run,getKB:function(){return KB;},getR:function(){return R;},m
       + '.aiSumBox{border:1px solid #b9d3ea;background:#f3f8fd;border-radius:10px;padding:10px 13px;margin-top:12px;'
       + 'font-size:12px;color:#1b2430;line-height:1.85}'
       + '.aiSumBox h6{margin:0 0 6px;font-size:12.5px;color:#1f5c99}'
-      + '@media print{#aiDrawer,#aiFab,#aiGlow{display:none!important}}';
+      + '@media print{#aiDrawer,#aiFab,#aiAskFab,#aiGlow{display:none!important}}';
     document.head.appendChild(st);
     var fab = document.createElement('div');
     fab.id = 'aiFab'; fab.title = 'AI 增强（点击配置）'; fab.textContent = '✨';
     fab.addEventListener('click', openConfig);
     document.body.appendChild(fab);
+    /* 主人 2026-11-12 定：AI 问答悬浮球（✨ 球上方），点击直接进入问答，随时可问 */
+    var qf = document.createElement('div');
+    qf.id = 'aiAskFab'; qf.title = 'AI 问答：随时提问，回答可并入补充信息参与诊断'; qf.textContent = '问';
+    qf.addEventListener('click', aiAsk);
+    document.body.appendChild(qf);
     /* 2026-11-10 增：AI 调用中的大动画层（右下角 1/4 页面） */
     var glow = document.createElement('div');
     glow.id = 'aiGlow';
@@ -10635,7 +10657,6 @@ window.__diag={run:run,getKB:function(){return KB;},getR:function(){return R;},m
       + '<button class="aidBtn" id="aiSave" type="button">保存配置</button>'
       + '<button class="aidBtn gh" id="aiForget" type="button">忘记密钥</button>'
       + '<button class="aidBtn gh" id="aiNow" type="button">立即诊断</button>'
-      + '<button class="aidBtn gh" id="aiAskBtn" type="button">AI 追问</button>'
       + '</div>'
       + '<span id="aiState" style="font-size:11.5px;color:#7f92aa"></span>'
       + '<div class="aidHint" style="margin-top:10px">'
@@ -10723,7 +10744,6 @@ window.__diag={run:run,getKB:function(){return KB;},getR:function(){return R;},m
       if (!D.getR()) { $('aiState').textContent = '请先生成诊断报告，再融合 AI 建议'; return; }
       autoDiagnose();
     });
-    $('aiAskBtn').addEventListener('click', function () { aiAsk(); });
   }
 
   /* ---------------- 功能一：缺口补检（结果直接写进覆盖度面板） ---------------- */
@@ -10872,41 +10892,92 @@ window.__diag={run:run,getKB:function(){return KB;},getR:function(){return R;},m
     autoDiagnose();
   }
 
-  /* ---------------- 自由追问 ---------------- */
+  /* ---------------- AI 问答（主人 2026-11-12 定：独立按钮、随时可问、答案可并入补充信息参与诊断） ---------------- */
   var ASK_SYS = '你是项目运营诊断助手。下面给你某外包项目的走访口述与补充信息原文（已脱敏、可能截断），以及本次诊断的结果摘要。\n'
     + '要求：① 只依据材料回答，不臆造数据、人名、时间；② 材料没覆盖到的，明确说「材料未体现」，并指出应补充哪类信息；'
     + '③ 回答用中文，条理清晰、可执行，控制在 400 字以内；④ 涉及整改建议时，说明依据来自材料的哪句话。';
+  var QA_SYS = '你是制造业外包项目运营的答疑顾问，覆盖用工管理、现场管理、精益改善、IT 工具应用、客户服务等场景。\n'
+    + '要求：① 依据行业通用实践回答，不臆造数据、人名、时间；② 回答用中文，条理清晰、可操作，控制在 400 字以内；'
+    + '③ 涉及具体项目现状时，提示用户可在走访口述中补充相应信息后生成诊断；④ 不确定的内容明确说明，不编造。';
+  function aiReady() {
+    var c = cfg();
+    if (c.on && (c.key || '').trim()) return true;
+    /* 主人 2026-11-12 定：未开启时不弹右侧抽屉，改居中提示卡（显眼、不遮操作） */
+    if (!$('aiNeedCard')) {
+      var d = document.createElement('div');
+      d.id = 'aiNeedCard';
+      d.innerHTML = '<div class="ancBox"><b>✨ AI 问答需要先开启 AI 大模型</b>'
+        + '<div>完成服务商与 API Key 配置后即可随时提问，回答可并入补充信息参与诊断。</div>'
+        + '<div style="display:flex;gap:10px;justify-content:center;margin-top:16px">'
+        + '<button class="ancBtn" id="ancGo" type="button">去配置</button>'
+        + '<button class="ancBtn gh" id="ancClose" type="button">暂不</button></div></div>';
+      document.body.appendChild(d);
+      $('ancGo').addEventListener('click', function () { d.remove(); openConfig(); });
+      $('ancClose').addEventListener('click', function () { d.remove(); });
+    }
+    return false;
+  }
+  function aiAppendAns(txt) {
+    var ta = $('tx2');
+    if (!ta) { toast('未找到补充信息框'); return; }
+    ta.value = (String(ta.value || '').replace(/\s+$/, '') ? String(ta.value).replace(/\s+$/, '') + '\n' : '')
+      + '【AI 问答补充】' + txt;
+    toast('已并入补充信息框，点 ▶ 重新诊断即可计入');
+  }
   function aiAsk() {
-    var b = drawer('✨ AI 自由追问');
+    if (!aiReady()) return;
+    ensureUI();
+    var ex = $('aidAsk'), dr = $('aiDrawer');
+    var curMat = !!String(clip(D.rawText(), 8000)).trim();
+    if (ex && dr && ex.dataset.mat === (curMat ? '1' : '0')) { dr.classList.add('on'); ex.focus(); return; }  /* 已开着且模式一致：保留历史继续问 */
+    var b = drawer('✨ AI 问答');
     var raw = clip(D.rawText(), 8000);
-    if (!raw.trim()) { b.innerHTML = '<div class="aidCard">请先录入走访口述或补充信息。</div>'; return; }
-    var mk = mask(raw);
+    var hasMat = !!String(raw).trim();
+    var mk = hasMat ? mask(raw) : null;
     var R = D.getR();
-    var sum = R ? ('总得分 ' + R.total + ' 分；整改事项 ' + R.fixes.length + ' 项；覆盖度 ' + ((D.coverStat() || {}).rate || '—') + '%')
-                : '（尚未生成报告）';
-    b.innerHTML = '<div class="aidCard"><div style="font-size:11.5px;color:#9fb0c2">将基于<b>走访口述 + 补充信息（已脱敏）</b>与诊断结果摘要作答。'
-      + '诊断摘要：' + esc(sum) + '</div>'
-      + '<textarea id="aidAsk" placeholder="例如：这次走访里，人员流失的根因还能怎么挖？" style="margin-top:8px"></textarea>'
+    var sum = hasMat ? (R ? ('总得分 ' + R.total + ' 分；整改事项 ' + R.fixes.length + ' 项；覆盖度 ' + ((D.coverStat() || {}).rate || '—') + '%')
+                : '（尚未生成报告）') : '';
+    b.innerHTML = '<div class="aidCard"><div style="font-size:11.5px;color:#9fb0c2">'
+      + (hasMat
+          ? '材料模式：将基于<b>走访口述 + 补充信息（已脱敏）</b>与诊断摘要作答。诊断摘要：' + esc(sum)
+          : '答疑模式：当前无走访材料，可直接提问外包项目运营相关问题；回答可一键并入补充信息参与诊断。')
+      + '</div>'
+      + '<textarea id="aidAsk" placeholder="' + (hasMat ? '例如：这次走访里，人员流失的根因还能怎么挖？' : '例如：电子签到与纸质签到怎么平滑过渡？') + '" style="margin-top:8px"></textarea>'
       + '<div style="margin-top:8px;display:flex;gap:8px"><button class="aidBtn" id="aidSend" type="button">发送</button>'
       + '<button class="aidBtn gh" id="aidCancel" type="button">关闭</button></div></div><div id="aidAns"></div>';
     var ta = b.querySelector('#aidAsk');
-    if (ta) ta.focus();
+    if (ta) { ta.dataset.mat = hasMat ? '1' : '0'; ta.focus(); }
     b.querySelector('#aidCancel').addEventListener('click', closeDrawer);
     b.querySelector('#aidSend').addEventListener('click', function () {
+      if (!aiReady()) return;
       var q = (ta.value || '').trim();
       if (!q) { toast('请输入问题'); return; }
       var ans = $('aidAns');
-      ans.innerHTML = '<div class="aidWait">✨ 正在思考…</div>';
-      var user = '【材料原文（已脱敏）】\n' + mk.text + '\n\n【诊断结果摘要】\n' + sum + '\n\n【我的问题】\n' + q;
-      chat(ASK_SYS, user).then(function (txt) {
-        var t = unmask(txt, mk.map);
-        ans.innerHTML = '<div class="aidCard"><h5>回答</h5><div style="white-space:pre-wrap">' + esc(t) + '</div>'
-          + '<div style="margin-top:8px"><button class="aidBtn gh" data-cp="' + esc(t) + '" type="button">复制回答</button></div></div>';
-        Array.prototype.forEach.call(ans.querySelectorAll('[data-cp]'), function (el) {
+      ans.insertAdjacentHTML('beforeend', '<div class="aidCard" style="border-color:rgba(126,179,255,.3)">'
+        + '<div style="color:#7eb3ff;font-size:11.5px;margin-bottom:4px">问：' + esc(q) + '</div>'
+        + '<div class="aidWait">✨ 正在思考…</div></div>');
+      var last = ans.lastElementChild;
+      var user = hasMat
+        ? '【材料原文（已脱敏）】\n' + mk.text + '\n\n【诊断结果摘要】\n' + sum + '\n\n【我的问题】\n' + q
+        : '【我的问题】\n' + q;
+      chat(hasMat ? ASK_SYS : QA_SYS, user).then(function (txt) {
+        var t = unmask(txt, mk ? mk.map : null);
+        last.innerHTML = '<div style="color:#7eb3ff;font-size:11.5px;margin-bottom:4px">问：' + esc(q) + '</div>'
+          + '<h5>回答' + (hasMat ? '' : '（答疑模式）') + '</h5><div style="white-space:pre-wrap">' + esc(t) + '</div>'
+          + '<div style="margin-top:8px;display:flex;gap:8px;flex-wrap:wrap">'
+          + '<button class="aidBtn" data-in="' + esc(t) + '" type="button">并入补充信息</button>'
+          + '<button class="aidBtn gh" data-cp="' + esc(t) + '" type="button">复制回答</button></div>';
+        Array.prototype.forEach.call(last.querySelectorAll('[data-cp]'), function (el) {
           el.addEventListener('click', function () { copyText(this.getAttribute('data-cp')); });
         });
-        footNote(ans);
-      }).catch(function (e) { errBox(ans, e); footNote(ans); });
+        Array.prototype.forEach.call(last.querySelectorAll('[data-in]'), function (el) {
+          el.addEventListener('click', function () { aiAppendAns(this.getAttribute('data-in')); });
+        });
+        footNote(b);
+      }).catch(function (e) {
+        last.innerHTML = '<div style="color:#7eb3ff;font-size:11.5px;margin-bottom:4px">问：' + esc(q) + '</div>';
+        errBox(last, e); footNote(b);
+      });
     });
   }
 
