@@ -359,6 +359,7 @@ function renderKpi(){
       KPIV[rid]=KPIV[rid]||{}; KPIV[rid].na=this.checked;
       if(this.checked){ KPIV[rid].v=''; row.querySelector('[data-k=v]').value=''; }
       row.querySelector('[data-k=s]').textContent=this.checked?'N/A':'—';
+      KPIDIRTY=true;   /* 2026-11-11 主人定：不自动重跑，等手动「补充信息并入重跑」 */
     });
   });
 }
@@ -1133,6 +1134,7 @@ T.push('<div class="srcbox">'
 
 /* ---------------- 主流程 ---------------- */
 function run(){
+  KPIDIRTY=false;   /* 任何一次完整诊断都会消化掉待生效标注 */
   pReset();
   var meta={
     name:($('mName').value||'').trim()||'未命名项目',
@@ -1956,6 +1958,7 @@ function applyMd(jobs,errs,done){
    未提及 / 有描述无机制 → 必须补充；有机制无记录 → 建议补充；已覆盖 → 无需补；
    确认与本项目无关的，可显式标「无 / 不相关」，不计入缺口。 */
 var COVERV={}, COVERX={}, CV=null, LAST={D:null,S:null}, CVSHOWALL=false;
+var KPIDIRTY=false; /* 2026-11-11 主人定：标注「不适用」等不再自动重跑，置脏标记，统一由「补充信息并入重跑」触发 */
 function coverDef(){ return (KB.cover)||{}; }
 function stateName(code){
   var s=(coverDef().states||[]).filter(function(x){return x.code===code;})[0];
@@ -2063,7 +2066,11 @@ function mergeSupplements(){
     parts.forEach(function(p){ add.push(label+p); });
     done.push(k);
   });
-  if(!add.length){ toast('请先在待补充项下方输入补充信息'); return; }
+  if(!add.length){
+    /* 2026-11-11 主人定：没有新补充文字，但有待生效的「不适用」等标注时，也允许手动重跑一次 */
+    if(KPIDIRTY){ KPIDIRTY=false; toast('没有新补充信息，已按当前标注重新诊断'); run(); return; }
+    toast('请先在待补充项下方输入补充信息'); return;
+  }
   var ta=$('tx2');
   ta.value=(ta.value&&ta.value.trim()?ta.value.replace(/\s+$/,'')+'\n':'')+add.join('\n');
   done.forEach(function(k){ delete COVERX[k]; delete COVERV[k]; }); /* 补充后交回自动判定 */
@@ -2181,11 +2188,11 @@ function renderCover(){
     el.addEventListener('change',function(){
       var id=this.getAttribute('data-kna'), v=this.value;
       this.value='';
-      if(v==='NA'){ KPIV[id]={na:true,v:'',manual:false}; toast(id+' 已标「无/不适用」，计入 K 折算'); }
-      else if(v==='CLR'){ delete KPIV[id]; toast(id+' 标注已清除，恢复自动判定'); }
+      if(v==='NA'){ KPIV[id]={na:true,v:'',manual:false}; toast(id+' 已标「无/不适用」，点「补充信息并入重跑」后计入 K 折算'); }
+      else if(v==='CLR'){ delete KPIV[id]; toast(id+' 标注已清除，点「补充信息并入重跑」后生效'); }
       else return;
       if(typeof renderKpi==='function') renderKpi();
-      run();
+      KPIDIRTY=true;   /* 2026-11-11 主人定：不自动重跑，等手动「补充信息并入重跑」 */
     });
   });
   $('btnMergeSup').addEventListener('click',mergeSupplements);
@@ -3123,7 +3130,7 @@ function fillDemo(){
 function clearAll(){
   ['mName','mType','mHead','mConf','tx','tx2'].forEach(function(id){ var e=$(id); if(e) e.value=''; });
   (function(){ var md=$('mDate'); if(md){ md.value=''; md.classList.remove('filled'); } })();
-  KPIV={}; COVERV={}; COVERX={}; CV=null; LAST={D:null,S:null}; saveCoverV(); saveCoverX(); renderCover();
+  KPIV={}; COVERV={}; COVERX={}; CV=null; LAST={D:null,S:null}; KPIDIRTY=false; saveCoverV(); saveCoverX(); renderCover();
   renderKpi(); count(); pReset();
   $('doc').innerHTML='<div class="idle-art">点绿色 ▶ 按钮生成诊断报告后，这里会逐步展开：四维子项命中情况、指标抽取、评分赋分、信息提取、措施收敛、优先级排序。</div>';
   $('jNow').textContent='等待输入'; setPill('待录入'); paintRail(-1);
@@ -3184,6 +3191,7 @@ if(document.readyState==='loading') document.addEventListener('DOMContentLoaded'
 window.__diag={run:run,getKB:function(){return KB;},getR:function(){return R;},mdVols:mdVols,applyMd:applyMd,applyLayout:applyLayout,reportHtml:reportHtml,
   seedText:seedText, akHash:akHash, akMigrate:akMigrate,
   buildCover:function(){return buildCover(LAST.D,LAST.S);},askList:askList,coverStat:function(){return CV?CV.stat:null;},
+  dirty:function(){return KPIDIRTY;},   /* 2026-11-11 调试口：读取待生效标注脏标记 */
   judge:judge,methodsFor:methodsFor,scanRedFlags:scanRedFlags,buildEvals:buildEvals,
   /* 2026-10-27 新增：供 AI 增强模块（05_llm.js）调用的接口 */
   toast:toast,esc:esc,renderCover:renderCover,
